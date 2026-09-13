@@ -1,7 +1,7 @@
-neuralforecast
-statsforecast
-utilsforecast
-yfinance
-pandas
-numpy
-matplotlib
+neuralforecast==3.2.2
+statsforecast==2.1.1
+utilsforecast==0.2.16
+yfinance==1.7.0
+pandas==2.3.3
+numpy==2.5.3
+matplotlib==3.11.2
