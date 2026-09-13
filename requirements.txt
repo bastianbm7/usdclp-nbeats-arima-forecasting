@@ -1,0 +1,7 @@
+neuralforecast
+statsforecast
+utilsforecast
+yfinance
+pandas
+numpy
+matplotlib
