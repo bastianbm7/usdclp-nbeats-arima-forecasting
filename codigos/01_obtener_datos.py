@@ -21,12 +21,31 @@ def descargar_serie(start=FECHA_INICIO):
     return df
 
 
+def limpiar_ticks_erroneos(df, umbral=0.3):
+    # yfinance a veces devuelve un tick corrupto de un solo dia que se revierte al
+    # siguiente (visto en CLP=X: 2016-12-22 con y=5.00 en vez de ~660, y 2014-04-10
+    # con y=5.46 en vez de ~544) - se detecta como una caida Y rebote > umbral contra
+    # AMBOS vecinos (un movimiento real de un solo dia en USD/CLP no se acerca a eso)
+    # y se interpola en vez de dejar pasar un retorno de +-488% a los modelos.
+    y = df["y"]
+    ratio_prev = y / y.shift(1)
+    ratio_next = y / y.shift(-1)
+    es_tick_malo = (ratio_prev < umbral) & (ratio_next < umbral)
+    if es_tick_malo.any():
+        fechas_malas = df.loc[es_tick_malo, "ds"].dt.date.tolist()
+        print(f"Ticks corruptos detectados y corregidos (interpolados): {fechas_malas}")
+        df.loc[es_tick_malo, "y"] = None
+        df["y"] = df["y"].interpolate()
+    return df
+
+
 def transformar_a_formato_largo(df_crudo):
     df = df_crudo[["Close"]].reset_index()
     df.columns = ["ds", "y"]
     df.insert(0, "unique_id", UNIQUE_ID)
     df["ds"] = pd.to_datetime(df["ds"])
     df = df.dropna(subset=["y"]).sort_values("ds").reset_index(drop=True)
+    df = limpiar_ticks_erroneos(df)
     return df
 
 
