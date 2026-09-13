@@ -2,6 +2,8 @@
 
 Compara modelos modernos de forecasting — **N-BEATS** y **N-HiTS** (vía [Nixtla/neuralforecast](https://github.com/Nixtla/neuralforecast), Apache-2.0, usado como dependencia) — contra un baseline clásico (**AutoARIMA** y **Naive**, vía [Nixtla/statsforecast](https://github.com/Nixtla/statsforecast)) pronosticando el tipo de cambio **USD/CLP**.
 
+📄 **[Ver el paper completo](reportes/paper.md)** — resumen, metodología, resultados y discusión de las 4 partes del estudio (diario, mensual, anual, aprendizaje online) en un solo documento. Este README es la referencia práctica (cómo está armado el repo, cómo correrlo); el paper es la narrativa de investigación.
+
 ## Pregunta que responde
 
 ¿Un modelo moderno de deep learning aporta una mejora real y medible sobre un baseline clásico al pronosticar el tipo de cambio, o la mejora observada es mayormente autocorrelación del precio diario (el valor de hoy predice casi perfecto el de mañana)?
@@ -117,6 +119,9 @@ codigos/
 datos/
 ├── bases/        # CSV crudo de USD/CLP
 └── resultados/   # gráficos finales + tabla de métricas
+
+reportes/
+└── paper.md      # informe de investigación completo (resumen, metodología, resultados, discusión)
 ```
 
 ## Limitaciones conocidas
