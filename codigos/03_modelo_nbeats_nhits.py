@@ -15,13 +15,22 @@ HORIZONTE = 14  # igual que el baseline
 N_WINDOWS = 5
 NIVELES = [80, 90]
 INPUT_SIZE = 4 * HORIZONTE
-MAX_STEPS = 300  # reducido de 1000 (default) para que corra en minutos en CPU
+MAX_STEPS = 1500
+SCALER_TYPE = "standard"  # normaliza cada ventana de entrada - la serie no es estacionaria
+# (fue de ~500 a ~940 en 16 anios) y con scaler_type="identity" (default) el modelo
+# convergia a una prediccion casi constante en vez de capturar la dinamica reciente.
 
 
 def correr_backtesting(df):
     models = [
-        NBEATS(h=HORIZONTE, input_size=INPUT_SIZE, loss=MQLoss(), max_steps=MAX_STEPS),
-        NHITS(h=HORIZONTE, input_size=INPUT_SIZE, loss=MQLoss(), max_steps=MAX_STEPS),
+        NBEATS(
+            h=HORIZONTE, input_size=INPUT_SIZE, loss=MQLoss(),
+            max_steps=MAX_STEPS, scaler_type=SCALER_TYPE,
+        ),
+        NHITS(
+            h=HORIZONTE, input_size=INPUT_SIZE, loss=MQLoss(),
+            max_steps=MAX_STEPS, scaler_type=SCALER_TYPE,
+        ),
     ]
     nf = NeuralForecast(models=models, freq=FREQ)
     cv_df = nf.cross_validation(df=df, n_windows=N_WINDOWS, step_size=HORIZONTE, level=NIVELES)

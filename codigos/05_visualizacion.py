@@ -16,16 +16,25 @@ def cargar_cv_combinado():
     return df
 
 
+MODELO_A_COLUMNA = {"Naive": "Naive", "AutoARIMA": "AutoARIMA", "NBEATS": "NBEATS-median", "NHITS": "NHITS-median"}
+
+
 def graficar_prediccion_vs_real(cv_df):
+    metricas = pd.read_csv(f"{RESULTADOS_DIR}/metricas_comparacion.csv")
+    ganador = metricas.sort_values("RMSE").iloc[0]["modelo"]
+    columna_ganador = MODELO_A_COLUMNA[ganador]
+
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(cv_df["ds"], cv_df["y"], label="USD/CLP real", color="black", linewidth=2)
     ax.plot(cv_df["ds"], cv_df["Naive"], label="Naive", linestyle="--", color="gray")
     ax.plot(cv_df["ds"], cv_df["AutoARIMA"], label="AutoARIMA", linestyle="--", color="tab:orange")
-    ax.plot(cv_df["ds"], cv_df["NBEATS-median"], label="N-BEATS", color="tab:blue", linewidth=2)
-    ax.plot(cv_df["ds"], cv_df["NHITS-median"], label="N-HiTS", linestyle="-.", color="tab:green")
+    otro_modelo_nn = "NHITS-median" if columna_ganador == "NBEATS-median" else "NBEATS-median"
+    otro_alias = "N-HiTS" if columna_ganador == "NBEATS-median" else "N-BEATS"
+    ax.plot(cv_df["ds"], cv_df[otro_modelo_nn], label=otro_alias, linestyle="-.", color="tab:green", alpha=0.6)
+    ax.plot(cv_df["ds"], cv_df[columna_ganador], label=f"{ganador} (mejor RMSE)", color="tab:blue", linewidth=2)
     ax.fill_between(
-        cv_df["ds"], cv_df["NBEATS-lo-80"], cv_df["NBEATS-hi-80"],
-        color="tab:blue", alpha=0.15, label="N-BEATS intervalo 80%",
+        cv_df["ds"], cv_df[f"{ganador}-lo-80"], cv_df[f"{ganador}-hi-80"],
+        color="tab:blue", alpha=0.15, label=f"{ganador} intervalo 80%",
     )
     ax.set_title("USD/CLP: prediccion vs. real (backtesting walk-forward, 5 ventanas x 14 dias)")
     ax.set_xlabel("Fecha")
@@ -39,8 +48,9 @@ def graficar_prediccion_vs_real(cv_df):
 
 def graficar_barras_rmse():
     metricas = pd.read_csv(f"{RESULTADOS_DIR}/metricas_comparacion.csv")
+    ganador = metricas.sort_values("RMSE").iloc[0]["modelo"]
     fig, ax = plt.subplots(figsize=(7, 5))
-    colores = ["tab:blue" if m == "NBEATS" else "tab:gray" for m in metricas["modelo"]]
+    colores = ["tab:blue" if m == ganador else "tab:gray" for m in metricas["modelo"]]
     ax.bar(metricas["modelo"], metricas["RMSE"], color=colores)
     ax.set_ylabel("RMSE (backtesting, 5 ventanas x 14 dias)")
     ax.set_title("USD/CLP: RMSE por modelo")
