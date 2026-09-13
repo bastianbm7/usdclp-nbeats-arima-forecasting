@@ -78,6 +78,25 @@ El resultado más limpio de los tres análisis: `AutoARIMA` y `RandomWalkWithDri
 
 La lectura de portfolio no es "el deep learning gana siempre" ni "el baseline clásico gana siempre" — es que **la estructura dominante de una serie financiera cambia con la escala de tiempo**, y el modelo ganador cambia con ella. Eso es más honesto (y más interesante) que un único gráfico con un único ganador.
 
+## Aprendizaje online: horizontes cortos (1-3 pasos) con `refit=True`
+
+Los análisis anteriores entrenan una vez con datos históricos y nunca más se actualizan. Acá se prueba lo contrario — que el modelo se **reentrene en cada ventana a medida que aparecen datos nuevos**, con horizontes bien cortos (1, 2 y 3 pasos), sobre tres escalas (diaria/semanal/mensual). Esto ya está soportado nativo en Nixtla, no hace falta código de online-learning a mano:
+
+- `statsforecast` ya reentrena por ventana **por default** (`refit=True` es el default en su `cross_validation`) — por eso `AutoARIMA` podía elegir un orden distinto en cada ventana en los análisis anteriores.
+- `neuralforecast` por default NO lo hace (`refit=False`: entrena una vez, predice todas las ventanas con esos mismos pesos). Activando `refit=True` con `use_init_models=False` (default), cada reentreno **parte de los pesos de la ventana anterior** (warm start) en vez de reiniciar — es, literalmente, la red aprendiendo a medida que llegan datos nuevos.
+
+10 ventanas de backtesting por combinación (3 escalas × 3 horizontes = 9 combos en total).
+
+![Heatmap RMSE online learning](datos/resultados/online_learning_heatmap.png)
+
+**Lectura por escala** (rojo = peor de esa columna, verde = mejor — normalizado por columna, no comparable entre columnas):
+
+- **Diaria (h=1,2,3)**: gana el naive en los tres horizontes, con un margen chico en h=3 para N-HiTS (-1%, prácticamente empate). A horizontes de 1-3 días el ruido/autocorrelación domina tan fuerte que ni el online learning le encuentra la vuelta — coherente con todo lo que ya vimos en la sección diaria original.
+- **Semanal (h=1,2,3)**: acá el online learning se luce — **N-HiTS gana los tres horizontes**, y en h=1/h=2 por márgenes grandes (-51% y -52% vs. el mejor baseline). Es la escala donde reentrenar con cada dato nuevo aporta más valor real.
+- **Mensual (h=1,2,3)**: resultado mixto y el más interesante de investigar. En h=1 y h=2, N-HiTS/N-BEATS mejoran al baseline (N-BEATS en h=2 llega a RMSE=3.25 contra 29.85 del naive, un salto enorme). Pero en **h=3 ambas redes fallan catastróficamente** (RMSE ~95-110 contra ~41 del naive) — y no es un problema de falta de entrenamiento: subir el presupuesto de 100 a 300 pasos por reentreno mejoró mucho h=1/h=2 (sobre todo h=2) pero **no cambió nada en h=3** (verificado corriendo ambos presupuestos, no asumido). Queda como una inestabilidad real y no resuelta de combinar warm-start + horizonte de 3 meses en una serie tan corta (200 obs.) — se documenta como hallazgo, no se esconde ni se fuerza un ajuste para que desaparezca.
+
+**Por qué esto importa para el proyecto en general**: el mensaje no es "el online learning es mejor" ni "es peor" — es que **ayuda mucho en algunos combos (semanal, sobre todo) y puede volverse inestable en otros (mensual h=3) de forma que más cómputo no arregla**. Eso es más honesto que optimizar solo la configuración que se ve mejor y mostrar únicamente esa.
+
 ## Datos
 
 Tipo de cambio USD/CLP, serie diaria descargada con [`yfinance`](https://github.com/ranaroussi/yfinance) (ticker `CLP=X`, fuente: Yahoo Finance). Se guarda una copia cruda en `datos/bases/` para reproducibilidad exacta (no depender de que Yahoo siga sirviendo el mismo histórico).
@@ -92,7 +111,8 @@ codigos/
 ├── 04_metricas_comparacion.py   # RMSE/MAE/MAPE por modelo, tabla comparativa (diario)
 ├── 05_visualizacion.py          # predicción vs. real + intervalos + baseline superpuesto (diario)
 ├── 06_analisis_mensual.py       # mismo pipeline completo (datos+baseline+NN+métricas+gráficos), resampleado a mensual
-└── 07_analisis_anual.py         # mismo pipeline sin NN (no hay data suficiente), resampleado a anual
+├── 07_analisis_anual.py         # mismo pipeline sin NN (no hay data suficiente), resampleado a anual
+└── 08_online_learning.py        # refit=True (warm start) x 3 escalas x horizontes 1/2/3 pasos
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
@@ -106,6 +126,7 @@ datos/
 - **Nivel 1 de proporcionalidad**: sin tests automatizados ni monitoreo — es una pieza de portfolio personal, no un servicio en producción.
 - **Dependencia de Yahoo Finance**: `yfinance` puede cambiar de comportamiento — mitigado guardando una copia cruda del CSV descargado.
 - **Backtesting anual con n=16**: 3 ventanas de evaluación sobre 16 observaciones totales es una muestra chica — el resultado (AutoARIMA/RWD >> Naive) es consistente y tiene explicación matemática clara, pero no hay que leerlo con la misma confianza estadística que el diario (4.346 obs.) o el mensual (200 obs.).
+- **Online learning mensual a h=3 es inestable**: el `refit=True` con warm start rompe en esa combinación específica (RMSE 2-3x peor que el naive) y subir el presupuesto de entrenamiento no lo arregla — no identificado el mecanismo exacto (hipótesis: optimizer sin estado propio en cada reentreno + horizonte largo relativo a una serie corta), documentado como falla abierta en vez de ocultarlo o forzar un ajuste que la haga desaparecer.
 
 ## Paper(s) ancla
 
