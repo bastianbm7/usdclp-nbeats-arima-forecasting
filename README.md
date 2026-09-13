@@ -11,8 +11,9 @@ Compara modelos modernos de forecasting — **N-BEATS** y **N-HiTS** (vía [Nixt
 - Backtesting walk-forward (múltiples ventanas de validación, no un solo split train/test).
 - Horizonte de pronóstico de varios pasos (no 1 solo paso) — a 1 paso el naive casi siempre "gana" por autocorrelación pura; a varios pasos esa ventaja se diluye.
 - Métricas de error en test: RMSE, MAE, MAPE — calculadas para los cuatro modelos (Naive, AutoARIMA, NBEATS, NHITS) sobre las mismas ventanas.
+- El mismo análisis se repite a **tres escalas de tiempo** (diaria, mensual, anual) resampleando la misma serie — no son datasets distintos, es la pregunta "¿un modelo moderno mejora al baseline clásico?" respondida en cada horizonte por separado, porque la estructura dominante de la serie cambia con la escala (ver síntesis al final).
 
-## Resultados
+## Resultados diarios
 
 Backtesting walk-forward: 5 ventanas no solapadas de 14 días hábiles cada una (70 días hábiles de evaluación fuera de muestra, jun-sep 2026), sobre la serie completa 2010-2026 (~4.346 observaciones).
 
@@ -36,6 +37,47 @@ Esto no era el resultado inicial: la primera versión de este pipeline usaba `sc
 
 En resumen: de los cuatro modelos, dos (Naive, AutoARIMA) están matemáticamente forzados a ser (casi) planos por lo que son — no por un error de código — y de los dos que sí tienen libertad para curvarse (N-BEATS, N-HiTS), solo uno la usó bien.
 
+## Resultados mensuales
+
+Misma comparación, resampleando a cierre de mes (200 observaciones, 2010-01 a 2026-08), backtesting de 5 ventanas de 6 meses cada una.
+
+| Modelo | RMSE | MAE | MAPE | Mejora RMSE vs. mejor baseline |
+|---|---|---|---|---|
+| **N-BEATS** | **33.09** | **30.82** | **3.28%** | **+20.7%** |
+| Naive | 41.71 | 35.40 | 3.81% | — (mejor baseline) |
+| N-HiTS | 42.57 | 35.11 | 3.77% | -2.1% |
+| AutoARIMA | 44.26 | 38.77 | 4.16% | -6.1% |
+
+![Predicción vs. real mensual](datos/resultados/prediccion_vs_real_mensual.png)
+![RMSE por modelo mensual](datos/resultados/rmse_comparacion_mensual.png)
+
+Acá se invierten los papeles: **N-BEATS** es el que gana (+20.7%), no N-HiTS — confirmado que no es casualidad de una ventana (se verificó la varianza del pronóstico dentro de cada ventana, en la misma escala que la real, no un artefacto de predicción plana). Ninguno de los dos modelos de Nixtla es sistemáticamente mejor en todas las escalas; cuál gana depende de la frecuencia. Un detalle honesto que el gráfico deja ver: en la ventana de cutoff 2024-12, ambos modelos de Nixtla sobre-extrapolan una racha alcista reciente y proyectan un salto a ~1.050-1.080 que la serie real nunca llega a tocar (se queda en ~950-990) — un caso real de sobre-reacción a momentum de corto plazo, no oculto en el resultado agregado porque el resto de las ventanas compensa.
+
+## Resultados anuales
+
+Misma comparación, resampleando a cierre de diciembre (16 observaciones completas, 2010-2025; se descarta 2026 por ser un año incompleto), backtesting de 3 años. **A propósito no se incluyen N-BEATS/N-HiTS acá** — con 16 puntos, entrenar una red neuronal no tiene sustento estadístico real (cualquier resultado sería ruido de una corrida, no una señal reproducible); se compara solo contra métodos clásicos diseñados para poca data.
+
+| Modelo | RMSE | MAPE | Mejora RMSE vs. Naive |
+|---|---|---|---|
+| **AutoARIMA** | **3.72** | **0.42%** | **+87.0%** |
+| **RandomWalkWithDrift** | **3.72** | **0.42%** | **+87.0%** |
+| Naive | 28.64 | 3.24% | — |
+
+![Predicción vs. real anual](datos/resultados/prediccion_vs_real_anual.png)
+![RMSE por modelo anual](datos/resultados/rmse_comparacion_anual.png)
+
+El resultado más limpio de los tres análisis: `AutoARIMA` y `RandomWalkWithDrift` dan **el mismo número exacto**, porque AutoARIMA elige por su cuenta un ARIMA(0,1,0) con drift — que es matemáticamente idéntico a un random walk con tendencia. A escala anual, USD/CLP se comporta como una caminata aleatoria con una depreciación promedio constante, y con solo agregar esa tendencia (nada de deep learning) se le gana al naive plano por 87%. Caveat honesto: ese mismo modelo con drift sobre-extrapola la ventana más reciente (2025→2026), proyectando ~1.030 cuando el real bajó a ~900 — la ganancia agregada de 3 ventanas no significa que el drift sea infalible ventana a ventana, y con n=16 cualquier métrica agregada tiene un margen de error grande.
+
+## Síntesis entre escalas
+
+| Escala | ¿Gana algo al naive? | Qué gana | Por qué |
+|---|---|---|---|
+| Diaria | Sí, +20% | N-HiTS | Único con libertad real de forma que la aprovechó bien; Naive/AutoARIMA quedan matemáticamente forzados a ser planos (random walk / MA(1) sin memoria) |
+| Mensual | Sí, +21% | N-BEATS | Con menos ruido de alta frecuencia, hay más momentum/estructura real para que una red capture — pero el "ganador" entre N-BEATS/N-HiTS cambia según la escala |
+| Anual | Sí, +87% | AutoARIMA = RandomWalkWithDrift | A esta escala domina una tendencia determinística (depreciación de largo plazo) más que el ruido — ni hace falta deep learning para capturarla |
+
+La lectura de portfolio no es "el deep learning gana siempre" ni "el baseline clásico gana siempre" — es que **la estructura dominante de una serie financiera cambia con la escala de tiempo**, y el modelo ganador cambia con ella. Eso es más honesto (y más interesante) que un único gráfico con un único ganador.
+
 ## Datos
 
 Tipo de cambio USD/CLP, serie diaria descargada con [`yfinance`](https://github.com/ranaroussi/yfinance) (ticker `CLP=X`, fuente: Yahoo Finance). Se guarda una copia cruda en `datos/bases/` para reproducibilidad exacta (no depender de que Yahoo siga sirviendo el mismo histórico).
@@ -45,10 +87,12 @@ Tipo de cambio USD/CLP, serie diaria descargada con [`yfinance`](https://github.
 ```
 codigos/
 ├── 01_obtener_datos.py          # descarga USD/CLP vía yfinance, split train/test
-├── 02_baseline_arima_naive.py   # statsforecast: AutoARIMA + Naive, backtesting walk-forward
-├── 03_modelo_nbeats_nhits.py    # neuralforecast: NBEATS + NHITS, mismo esquema de backtesting
-├── 04_metricas_comparacion.py   # RMSE/MAE/MAPE por modelo, tabla comparativa
-└── 05_visualizacion.py          # predicción vs. real + intervalos + baseline superpuesto
+├── 02_baseline_arima_naive.py   # statsforecast: AutoARIMA + Naive, backtesting walk-forward (diario)
+├── 03_modelo_nbeats_nhits.py    # neuralforecast: NBEATS + NHITS, mismo esquema de backtesting (diario)
+├── 04_metricas_comparacion.py   # RMSE/MAE/MAPE por modelo, tabla comparativa (diario)
+├── 05_visualizacion.py          # predicción vs. real + intervalos + baseline superpuesto (diario)
+├── 06_analisis_mensual.py       # mismo pipeline completo (datos+baseline+NN+métricas+gráficos), resampleado a mensual
+└── 07_analisis_anual.py         # mismo pipeline sin NN (no hay data suficiente), resampleado a anual
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
@@ -61,6 +105,7 @@ datos/
 - **Nixtla/neuralforecast es una dependencia, no un fork**: se usa la implementación de la librería de N-BEATS/N-HiTS (Apache-2.0), no el código original de los autores (Oreshkin et al. / Challu et al.) — la fidelidad al paper es metodológica, no literal.
 - **Nivel 1 de proporcionalidad**: sin tests automatizados ni monitoreo — es una pieza de portfolio personal, no un servicio en producción.
 - **Dependencia de Yahoo Finance**: `yfinance` puede cambiar de comportamiento — mitigado guardando una copia cruda del CSV descargado.
+- **Backtesting anual con n=16**: 3 ventanas de evaluación sobre 16 observaciones totales es una muestra chica — el resultado (AutoARIMA/RWD >> Naive) es consistente y tiene explicación matemática clara, pero no hay que leerlo con la misma confianza estadística que el diario (4.346 obs.) o el mensual (200 obs.).
 
 ## Paper(s) ancla
 
