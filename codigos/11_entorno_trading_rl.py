@@ -40,9 +40,11 @@ FEATURES_ESTADO = ["retorno_1s", "nhits_h1_rel", "nhits_h2_rel", "vol_garch", "m
 class USDCLPTradingEnv(gym.Env):
     metadata = {"render_modes": []}
 
-    def __init__(self, dataset_path=DATASET_PATH, slippage_pct=SLIPPAGE_PCT):
+    def __init__(self, dataset_path=DATASET_PATH, slippage_pct=SLIPPAGE_PCT, df=None):
         super().__init__()
-        self.df = cargar_dataset(dataset_path)
+        # df explicito = pasar un slice ya cargado (train/test split) sin releer
+        # ni reprocesar el CSV en cada split - ver 12_entrenar_agente_rl.py.
+        self.df = df.reset_index(drop=True) if df is not None else cargar_dataset(dataset_path)
         self.slippage_pct = slippage_pct
         self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(len(FEATURES_ESTADO),), dtype=np.float32)
@@ -72,7 +74,11 @@ class USDCLPTradingEnv(gym.Env):
         self._posicion_previa = posicion
         self._paso += 1
 
-        terminated = self._paso >= len(self.df) - 1
+        # >= len(self.df), no len(self.df)-1: cada fila ya trae su propio y_next
+        # (ver 10_generar_dataset_rl.py), asi que la ULTIMA fila tambien es
+        # operable - terminar un paso antes descartaba el 5% de una ventana de
+        # test de 20 semanas (bug encontrado evaluando walk-forward multi-ventana).
+        terminated = self._paso >= len(self.df)
         obs = self._obs() if not terminated else np.zeros(len(FEATURES_ESTADO), dtype=np.float32)
         info = {"retorno_semana": retorno_semana, "posicion": posicion, "valor_portafolio": self.valor_portafolio}
         return obs, float(retorno_neto), terminated, False, info
