@@ -1,0 +1,16 @@
+C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:137: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+  fecha_ini, fecha_fin = resultado_ppo["ds"].min(), resultado_ppo["ds"].max() + pd.Timedelta(weeks=1)
+Dataset: 348 semanas. Walk-forward: 5 ventanas x 20 semanas de test cada una (100 semanas de test en total)
+
+--- Ventana 1/5: train=248 semanas, test=2024-09-22 a 2025-02-02 ---
+--- Ventana 2/5: train=268 semanas, test=2025-02-09 a 2025-06-22 ---
+--- Ventana 3/5: train=288 semanas, test=2025-06-29 a 2025-11-09 ---
+--- Ventana 4/5: train=308 semanas, test=2025-11-16 a 2026-03-29 ---
+--- Ventana 5/5: train=328 semanas, test=2026-04-05 a 2026-08-16 ---
+
+=== Walk-forward completo: 100 semanas de test (out-of-sample), capital inicial $100, riesgo 3%/operacion ===
+
+              estrategia  capital_final  retorno_total_%  sharpe_anualizado  max_drawdown_%  win_rate_%  operaciones
+            Buy-and-hold      99.130448        -0.869552           0.002220      -15.443312   47.000000          100
+Umbral simple (Opcion A)      84.029255       -15.970745          -0.943048      -20.825995   51.470588           68
+                PPO (RL)     100.000000         0.000000                NaN        0.000000         NaN            0
