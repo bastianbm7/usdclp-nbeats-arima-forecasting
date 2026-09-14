@@ -35,9 +35,10 @@ SLIPPAGE_PCT = 0.0005  # spread simulado por cambio de posicion; comision = 0 en
 CAPITAL_INICIAL = 100.0
 RIESGO_MAX_PCT = 0.03
 K_STOP_LOSS = 1.0
+DSR_ETA = 0.01  # tasa de adaptacion del Differential Sharpe Ratio (Moody & Saffell 1998) - ver modo_recompensa="dsr" abajo
 
 
-def cargar_dataset(path=DATASET_PATH):
+def cargar_dataset(path=DATASET_PATH, incluir_momentum=False):
     df = pd.read_csv(path, parse_dates=["ds"]).sort_values("ds").reset_index(drop=True)
     df["retorno_1s"] = np.log(df["y"] / df["y"].shift(1))
     df["nhits_h1_rel"] = (df["nhits_h1"] - df["y"]) / df["y"]
@@ -46,6 +47,18 @@ def cargar_dataset(path=DATASET_PATH):
     df["rsi_norm"] = df["rsi"] / 100
     rango = (df["precio_max_ventana"] - df["precio_min_ventana"]).replace(0, np.nan)
     df["posicion_en_rango"] = (df["y"] - df["precio_min_ventana"]) / rango
+    if incluir_momentum:
+        # Hoja de ruta del radar-baseline (2026-09-13), Tier 1: retorno
+        # normalizado por volatilidad a 4 y 12 semanas (~1 y ~3 meses) - ancla:
+        # Moskowitz, Ooi & Pedersen (2012), "Time Series Momentum". Verificado
+        # en 19_features_nuevas_validacion.py: |r|<0.05 con el retorno futuro
+        # semanal, no supera el umbral |r|=0.11 de la seccion 9.5 - se prueba
+        # igual en el PPO porque una red puede combinar features no-linealmente
+        # de forma que la correlacion lineal individual no lo capta, y el
+        # Issue #2 ya establecio la disciplina de agotar variantes razonables
+        # antes de concluir en vez de asumir que no van a funcionar.
+        df["mom_4s"] = ((df["y"] - df["y"].shift(4)) / df["y"].shift(4)) / df["vol_garch"]
+        df["mom_12s"] = ((df["y"] - df["y"].shift(12)) / df["y"].shift(12)) / df["vol_garch"]
     return df.dropna().reset_index(drop=True)
 
 
@@ -112,6 +125,7 @@ def precomputar_salidas_tp_sl(df, diario, k_stop_loss=K_STOP_LOSS):
 
 
 FEATURES_ESTADO = ["retorno_1s", "nhits_h1_rel", "nhits_h2_rel", "vol_garch", "macd_rel", "rsi_norm", "posicion_en_rango"]
+FEATURES_MOMENTUM = ["mom_4s", "mom_12s"]  # ver cargar_dataset(incluir_momentum=True)
 
 
 class USDCLPTradingEnv(gym.Env):
@@ -119,16 +133,20 @@ class USDCLPTradingEnv(gym.Env):
 
     def __init__(self, dataset_path=DATASET_PATH, diario_path=DATOS_DIARIOS_PATH, slippage_pct=SLIPPAGE_PCT,
                  capital_inicial=CAPITAL_INICIAL, riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS, df=None,
-                 accion_continua=False, modo_recompensa="cruda"):
+                 accion_continua=False, modo_recompensa="cruda", incluir_momentum=False):
         super().__init__()
         # df explicito = pasar un slice ya cargado (train/test split) sin releer
         # ni reprocesar el CSV en cada split - ver 12_entrenar_agente_rl.py /
-        # 14_backtest_walkforward_gestion_riesgo.py.
+        # 14_backtest_walkforward_gestion_riesgo.py. incluir_momentum se pasa
+        # igual (no se infiere de las columnas de df) porque determina
+        # features_estado/observation_space aca abajo.
         #
-        # accion_continua y modo_recompensa (Issue #2): defaults reproducen
-        # exactamente el comportamiento original (accion discreta, recompensa
-        # cruda) - ver 17_agente_rl_mejoras.py para las variantes.
-        base = df.reset_index(drop=True) if df is not None else cargar_dataset(dataset_path)
+        # accion_continua y modo_recompensa (Issue #2), incluir_momentum y
+        # modo_recompensa="dsr" (hoja de ruta del radar-baseline, Tier 1):
+        # defaults reproducen exactamente el comportamiento original (accion
+        # discreta, recompensa cruda, sin momentum) - ver 17_agente_rl_mejoras.py
+        # y 20_agente_rl_ronda2.py para las variantes.
+        base = df.reset_index(drop=True) if df is not None else cargar_dataset(dataset_path, incluir_momentum=incluir_momentum)
         diario = pd.read_csv(diario_path, parse_dates=["ds"])
         self.df = precomputar_salidas_tp_sl(base, diario, k_stop_loss)
 
@@ -138,19 +156,22 @@ class USDCLPTradingEnv(gym.Env):
         self.k_stop_loss = k_stop_loss
         self.accion_continua = accion_continua
         self.modo_recompensa = modo_recompensa
+        self.features_estado = FEATURES_ESTADO + (FEATURES_MOMENTUM if incluir_momentum else [])
 
         if accion_continua:
             self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
         else:
             self.action_space = spaces.Discrete(3)
-        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(len(FEATURES_ESTADO),), dtype=np.float32)
+        self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(len(self.features_estado),), dtype=np.float32)
         self._paso = 0
         self._posicion_previa = 0.0
         self.capital = capital_inicial
         self.valor_portafolio = 1.0  # = capital / capital_inicial, se mantiene por compatibilidad con 12/13
+        self._dsr_a = 0.0  # medias moviles exponenciales del DSR (Moody & Saffell) - solo se usan si modo_recompensa="dsr"
+        self._dsr_b = 0.0
 
     def _obs(self):
-        return self.df.loc[self._paso, FEATURES_ESTADO].to_numpy(dtype=np.float32)
+        return self.df.loc[self._paso, self.features_estado].to_numpy(dtype=np.float32)
 
     def reset(self, *, seed=None, options=None):
         super().reset(seed=seed)
@@ -158,6 +179,8 @@ class USDCLPTradingEnv(gym.Env):
         self._posicion_previa = 0.0
         self.capital = self.capital_inicial
         self.valor_portafolio = 1.0
+        self._dsr_a = 0.0
+        self._dsr_b = 0.0
         return self._obs(), {}
 
     def step(self, action):
@@ -208,6 +231,22 @@ class USDCLPTradingEnv(gym.Env):
             # que empata con un mercado plano en vez de perder frente a el).
             retorno_bh = (fila["y_next"] - fila["y"]) / fila["y"]
             reward -= retorno_bh
+        elif self.modo_recompensa == "dsr":
+            # Hoja de ruta del radar-baseline (2026-09-13), Tier 1: Differential
+            # Sharpe Ratio (Moody & Saffell 1998/2001) - en vez de comparar
+            # contra un benchmark externo fijo (exceso_bh), penaliza la
+            # VARIANZA del propio historial reciente del agente dentro del
+            # episodio. Formula recursiva estandar: A_t/B_t son medias moviles
+            # exponenciales (tasa DSR_ETA) del retorno y retorno^2; D_t es la
+            # derivada de ese Sharpe respecto al retorno del paso actual, dado
+            # A/B previos - ya implementado con codigo real en FinRL-Meta
+            # (mismo grupo que se uso como ancla en 17_agente_rl_mejoras.py).
+            r_t = reward
+            delta_a, delta_b = r_t - self._dsr_a, r_t**2 - self._dsr_b
+            denom = self._dsr_b - self._dsr_a**2
+            reward = (self._dsr_b * delta_a - 0.5 * self._dsr_a * delta_b) / denom**1.5 if denom > 1e-12 else 0.0
+            self._dsr_a += DSR_ETA * delta_a
+            self._dsr_b += DSR_ETA * delta_b
         info = {"posicion": posicion, "pnl": pnl, "notional": notional, "razon_cierre": razon, "capital": self.capital}
         return obs, float(reward), terminated, False, info
 

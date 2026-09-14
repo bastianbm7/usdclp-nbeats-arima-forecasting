@@ -105,7 +105,9 @@ El forecasting de arriba responde si un modelo predice bien el precio. Una exten
 
 **Hallazgo, walk-forward de 100 semanas out-of-sample**: ninguna estrategia activa le ganó a mantener la posición sin apalancar (buy-and-hold: -0.9%; umbral simple: -16.0%; PPO: -52.2% con recompensa simplificada). Al reentrenar al agente con la **economía real** (apalancamiento + TP/SL) como recompensa, en vez de una versión simplificada, aprendió a **no operar nunca** — una respuesta racional dado que ninguna de las 7 variables del estado supera |r|=0.11 de correlación con el retorno real siguiente.
 
-**Issue #2 — ¿se puede destrabar al agente?**: se probaron 3 cambios independientes (más exploración vía `ent_coef`, acción continua en vez de discreta, recompensa como exceso sobre buy-and-hold). Más exploración y reward shaping **no cambiaron nada** — el agente converge a la política de no operar de forma idéntica en las tres configuraciones. Acción continua sí lo obliga a operar, pero pierde -16.8% — peor que no operar. El cuello de botella confirmado es la señal, no el agente. 📄 **[Ver el detalle completo, con gráficos, en la sección 9 del paper](reportes/paper.md#9-extensión-estrategia-de-trading-con-reinforcement-learning-septiembre-2026)**.
+**Issue #2 — ¿se puede destrabar al agente?**: se probaron 3 cambios independientes (más exploración vía `ent_coef`, acción continua en vez de discreta, recompensa como exceso sobre buy-and-hold). Más exploración y reward shaping **no cambiaron nada** — el agente converge a la política de no operar de forma idéntica en las tres configuraciones. Acción continua sí lo obliga a operar, pero pierde -16.8% — peor que no operar. El cuello de botella confirmado es la señal, no el agente.
+
+**Radar-baseline — ¿es la política de "no operar" un artefacto del entrenamiento, y hay una variable nueva barata que ayude?**: se validó con Kelly criterion (sin entrenar ningún agente) si existe edge explotable — la respuesta es no: la fracción "óptima" de Kelly apalanca la deriva histórica de USD/CLP y pierde -51.5% a -52.9% fuera de muestra, peor que no operar. Se probaron además 5 variables nuevas ancladas en papers concretos (diferencial de tasas Chile-EE.UU., retorno/momentum del cobre, momentum clásico de USD/CLP) — ninguna supera el umbral |r|=0.11 de la sección 9.5. 📄 **[Ver el detalle completo, con gráficos, en la sección 9.11 del paper](reportes/paper.md#911-radar-baseline-validar-la-propuesta-1-de-98-antes-de-construir-nada-septiembre-2026)**.
 
 ## Datos
 
@@ -131,7 +133,10 @@ codigos/
 ├── 14_backtest_walkforward_gestion_riesgo.py  # walk-forward real (5 ventanas), PPO vs buy-and-hold vs umbral simple
 ├── 15_analisis_features.py      # cuanto se correlaciona cada variable del estado con el retorno futuro real
 ├── 16_graficos_resultados_rl.py # graficos finales de la extension de RL (lee los CSV ya generados, no recalcula)
-└── 17_agente_rl_mejoras.py      # Issue #2: ent_coef, accion continua y reward shaping vs. buy-and-hold, solos y combinados
+├── 17_agente_rl_mejoras.py      # Issue #2: ent_coef, accion continua y reward shaping vs. buy-and-hold, solos y combinados
+├── 18_kelly_validacion.py       # radar-baseline Tier 0: Kelly criterion (sin RL) como segundo veredicto sobre si hay edge
+├── 19_features_nuevas_validacion.py  # radar-baseline Tier 2: correlacion + Kelly con tasas/cobre/momentum nuevos
+└── 20_agente_rl_ronda2.py       # radar-baseline Tier 1: PPO + momentum en el estado / reward Differential Sharpe Ratio
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
@@ -155,3 +160,6 @@ reportes/
 - Oreshkin et al., *N-BEATS: Neural basis expansion analysis for interpretable time series forecasting*, ICLR 2020 — [arXiv:1905.10437](https://arxiv.org/abs/1905.10437)
 - Challu et al., *N-HiTS: Neural Hierarchical Interpolation for Time Series Forecasting* — [arXiv:2201.12886](https://arxiv.org/abs/2201.12886)
 - Liu et al., *FinRL: Deep Reinforcement Learning Framework for Automated Trading*, ancla de la extensión de RL (sección 9 del paper) — [arXiv:2111.09395](https://arxiv.org/abs/2111.09395)
+- Moskowitz, Ooi & Pedersen, *Time Series Momentum*, ancla de la feature de momentum (sección 9.11/9.12) — [SSRN:2089463](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2089463)
+- Chen & Rogoff, *Commodity Currencies*, ancla de las features de cobre (sección 9.11) — *Journal of International Economics*, 2003
+- Moody & Saffell, *Reinforcement Learning for Trading*, ancla del reward Differential Sharpe Ratio (sección 9.12) — NeurIPS 1998
