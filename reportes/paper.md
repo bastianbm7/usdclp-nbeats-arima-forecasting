@@ -321,14 +321,40 @@ Aunque el Tier 0/2 (9.11) ya sugería que ninguna variable nueva iba a cambiar l
 
 **Lectura acumulada de 9.9 + 9.11 + 9.12**: de 6 variantes independientes probadas sobre el mismo agente/entorno (más exploración, acción continua, exceso sobre buy-and-hold, Kelly, momentum, DSR), solo dos cambiaron el comportamiento del agente (acción continua y momentum) y ambas perdieron plata igual — ninguna encontró una política rentable. La propuesta 1 de la sección 9.8 queda validada con evidencia, no solo con intuición: **el cuello de botella de este proyecto, a la escala y con los datos disponibles hoy, es la señal — no el agente, no el reward, no el espacio de acción.**
 
-### 9.13 Decisiones pendientes (no tomadas en automático)
+### 9.13 Seguimiento: el efecto del cobre aparece a frecuencia diaria, no semanal
 
-Este tramo (9.11-9.12) se corrió sin supervisión directa — se priorizaron los ítems de la hoja de ruta con menor costo/reversibilidad (Tier 0-2: sin datos nuevos que conseguir, o datos públicos gratis; cambios acotados al mismo agente/entorno) y se dejaron sin empezar los de mayor alcance, para que la decisión de invertir ahí sea explícita:
+La sección 9.11 dejó un cabo suelto explícito: Ferraro, Rogoff & Rossi (2015) — el paper que ancla la hipótesis de cobre como predictor de CLP — encuentran ese efecto a frecuencia **diaria**, no mensual, y el chequeo de 9.11 se hizo a frecuencia semanal (la que usa el agente). Se repitió el mismo chequeo de correlación (`21_features_nuevas_frecuencias.py`) a diario y a mensual, reusando los mismos datos de cobre/tasas ya descargados.
+
+| Frecuencia | Feature | Correlación con retorno futuro | Supera \|r\|=0.11 |
+|---|---|---|---|
+| **Diaria** (4.325 obs.) | **`copper_ret_1d`** | **-0.256** | **Sí, más del doble** |
+| Diaria | `copper_mom_5d` | -0.165 | Sí |
+| Diaria | `copper_mom_20d` | -0.075 | No |
+| Diaria | `rate_diff` | 0.004 | No |
+| Mensual (197 obs.) | `copper_ret_1m` | 0.105 | No (por poco) |
+| Mensual | `rate_diff` | 0.013 | No |
+| Mensual | `copper_mom_3m` | 0.004 | No |
+| Semanal (9.11, referencia) | `copper_mom_4s` | -0.082 | No |
+
+![Correlación de cobre/tasas por frecuencia](../datos/resultados/analisis_features_nuevas_correlacion_frecuencias.png)
+
+**Es el número más fuerte de toda la investigación de esta noche.** `copper_ret_1d` (retorno diario del cobre, `HG=F` vía `yfinance`) correlaciona -0.256 con el retorno del día siguiente de USD/CLP — más del doble del umbral que ninguna de las 7 variables originales (ni las 5 candidatas semanales de 9.11) logró superar. El signo es el esperado económicamente (cobre sube ⇒ CLP se aprecia ⇒ USD/CLP baja) y `copper_mom_5d` (momentum de 5 días) también supera el umbral (-0.165) — no es un número aislado, hay estructura consistente en la misma dirección a horizontes cortos, que se diluye con la ventana (`copper_mom_20d` ya cae a -0.075, mensual prácticamente a cero). Confirma exactamente el patrón que describe el paper ancla: el efecto cobre-CLP existe pero es de corto plazo, y se pierde al resamplear a semanas o meses — que es justo la escala a la que opera el agente hoy.
+
+**Caveat metodológico real, no cosmético, antes de festejar el número**: no se validó el timestamp exacto de cierre de `HG=F` (COMEX, vía `yfinance`) contra el de `CLP=X` (el ticker que usa `01_obtener_datos.py` para USD/CLP). Si el cierre del cobre que `yfinance` reporta para el "día t" ocurre, en la práctica, más tarde en el reloj que el cierre de CLP=X para ese mismo día calendario, parte de esta correlación podría ser información contemporánea filtrándose como si fuera predictiva (look-ahead sutil), no una relación causal de un día para el otro. Con los datos de walk-forward de otras partes del proyecto (ej. USD/CLP diario en la sección 4.1) esta clase de detalle de alineación temporal ya demostró importar — no se debe asumir que "un día de diferencia" es suficiente sin comprobarlo.
+
+**Lectura**: esto no cambia la conclusión de que el agente semanal actual no tiene señal explotable — sigue sin tenerla, con las variables y a la frecuencia que opera hoy. Pero sí cambia el diagnóstico de fondo: el problema no es necesariamente que "USD/CLP no tiene edge explotable en ningún lado" — es que, a la frecuencia semanal, la señal de cobre (que sí existe a diario) ya se diluyó. Antes de invertir en Tier 3/4 (multi-activo, arquitecturas nuevas), validar el timestamp y, si se confirma, evaluar si vale la pena una versión diaria del agente es probablemente la pista de mayor retorno esperado por hora invertida de todo lo que se investigó esta noche — pero es una decisión de alcance (cambiar la escala de todo el pipeline) que le corresponde a Bastián, no algo para decidir en automático.
+
+### 9.14 Decisiones pendientes (no tomadas en automático)
+
+Este tramo (9.11-9.13) se corrió sin supervisión directa — se priorizaron los ítems de la hoja de ruta con menor costo/reversibilidad (Tier 0-2: sin datos nuevos que conseguir, o datos públicos gratis; cambios acotados al mismo agente/entorno) y se dejaron sin empezar los de mayor alcance, para que la decisión de invertir ahí sea explícita:
 
 - [ ] **Tier 3 — multi-pares FX** (la Tarea original de Notion, ampliada con el hallazgo de X-Trend del radar): entrenar sobre un panel de varios pares en vez de USD/CLP aislado. Cautela documentada en el radar: el único estudio de transfer learning FX directo encontrado dio resultado negativo — no asumir que "más activos" resuelve esto solo, pero tampoco descartarlo sin probarlo, dado que el mecanismo de X-Trend (contexto compartido, no transfer secuencial) es distinto.
 - [ ] **Tier 4 — arquitectura cross-attention multi-activo (X-Trend)**: la evidencia más fuerte de mejora en activos con poca historia, pero implica repensar el pipeline completo — solo si Tier 3 no alcanza.
-- [ ] Repetir el chequeo de correlación de cobre/tasas (9.11) a frecuencia diaria y mensual — Ferraro, Rogoff & Rossi (2015) encuentran el efecto cobre-FX a diario, no a la frecuencia semanal que se probó acá. Quedó como sugerencia de sesión (chip), no iniciada.
-- [ ] Decidir si este trabajo (9.11-9.12) se formaliza como un Issue de GitHub retroactivo o se documenta solo en el paper — no se abrió Issue nuevo porque no había uno para el radar-baseline en sí, a diferencia de los Issues #1/#2.
+- [x] Repetir el chequeo de correlación de cobre/tasas (9.11) a frecuencia diaria y mensual — hecho, ver 9.13. **Resultado inesperado: a frecuencia diaria, `copper_ret_1d` sí supera el umbral (|r|=0.26, más del doble de 0.11)** — la pista más prometedora de toda la noche, pero requiere validación adicional antes de construir nada sobre ella (ver caveat de timestamp en 9.13).
+- [ ] Decidir si este trabajo (9.11-9.13) se formaliza como un Issue de GitHub retroactivo o se documenta solo en el paper — no se abrió Issue nuevo porque no había uno para el radar-baseline en sí, a diferencia de los Issues #1/#2.
+- [ ] **Nuevo, el más prometedor**: validar el timestamp exacto de cierre de `HG=F` (cobre, COMEX vía yfinance) contra el de `CLP=X` (USD/CLP, ver 01_obtener_datos.py) antes de confiar en el hallazgo de 9.14 — si los cierres no están bien alineados en el tiempo, la correlación diaria podría estar mezclando información contemporánea en vez de predictiva. Si se confirma que es genuinamente predictiva, evaluar si vale la pena un agente/estrategia a frecuencia diaria (no semanal) que use el retorno del cobre como feature principal — cambio de escala grande, no trivial de integrar al pipeline semanal actual.
 - [ ] Actualizar/cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" a la luz de este hallazgo (sigue pendiente, sin tocar).
+
+## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` a `17` para la extensión de trading con RL — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
