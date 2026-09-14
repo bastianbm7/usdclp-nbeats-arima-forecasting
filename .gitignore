@@ -4,3 +4,4 @@ __pycache__/
 .ipynb_checkpoints/
 pip_install.log
 lightning_logs/
+NOTAS-CLAUDE.md

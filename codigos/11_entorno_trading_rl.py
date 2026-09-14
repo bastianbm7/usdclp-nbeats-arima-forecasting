@@ -118,11 +118,16 @@ class USDCLPTradingEnv(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, dataset_path=DATASET_PATH, diario_path=DATOS_DIARIOS_PATH, slippage_pct=SLIPPAGE_PCT,
-                 capital_inicial=CAPITAL_INICIAL, riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS, df=None):
+                 capital_inicial=CAPITAL_INICIAL, riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS, df=None,
+                 accion_continua=False, modo_recompensa="cruda"):
         super().__init__()
         # df explicito = pasar un slice ya cargado (train/test split) sin releer
         # ni reprocesar el CSV en cada split - ver 12_entrenar_agente_rl.py /
         # 14_backtest_walkforward_gestion_riesgo.py.
+        #
+        # accion_continua y modo_recompensa (Issue #2): defaults reproducen
+        # exactamente el comportamiento original (accion discreta, recompensa
+        # cruda) - ver 17_agente_rl_mejoras.py para las variantes.
         base = df.reset_index(drop=True) if df is not None else cargar_dataset(dataset_path)
         diario = pd.read_csv(diario_path, parse_dates=["ds"])
         self.df = precomputar_salidas_tp_sl(base, diario, k_stop_loss)
@@ -131,8 +136,13 @@ class USDCLPTradingEnv(gym.Env):
         self.capital_inicial = capital_inicial
         self.riesgo_max_pct = riesgo_max_pct
         self.k_stop_loss = k_stop_loss
+        self.accion_continua = accion_continua
+        self.modo_recompensa = modo_recompensa
 
-        self.action_space = spaces.Discrete(3)
+        if accion_continua:
+            self.action_space = spaces.Box(low=-1.0, high=1.0, shape=(1,), dtype=np.float32)
+        else:
+            self.action_space = spaces.Discrete(3)
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf, shape=(len(FEATURES_ESTADO),), dtype=np.float32)
         self._paso = 0
         self._posicion_previa = 0.0
@@ -151,18 +161,29 @@ class USDCLPTradingEnv(gym.Env):
         return self._obs(), {}
 
     def step(self, action):
-        posicion = POSICION_POR_ACCION[int(action)]
+        if self.accion_continua:
+            posicion = float(np.clip(np.asarray(action, dtype=np.float32).reshape(-1)[0], -1.0, 1.0))
+        else:
+            posicion = POSICION_POR_ACCION[int(action)]
         fila = self.df.loc[self._paso]
         capital_previo = self.capital
 
         if posicion == 0:
             notional, pnl, razon = 0.0, 0.0, "plano"
         else:
+            # signo (no `posicion`) para el retorno %: el TP/SL precomputado es
+            # el mismo para cualquier tamano de apuesta en esa direccion (solo
+            # depende de precio de entrada y volatilidad), lo que escala con
+            # el tamano de la posicion es el notional apostado a ese retorno -
+            # con accion_continua, |posicion|<1 apuesta una fraccion del riesgo
+            # maximo en vez de largo/plano/corto puro. Con accion discreta
+            # (|posicion|=1) esto es identico a la formula original.
             direccion = "largo" if posicion > 0 else "corto"
+            signo = 1.0 if direccion == "largo" else -1.0
             distancia_riesgo = self.k_stop_loss * fila["vol_garch"]
-            notional = (self.riesgo_max_pct * capital_previo) / distancia_riesgo if distancia_riesgo > 0 else 0.0
+            notional = abs(posicion) * (self.riesgo_max_pct * capital_previo) / distancia_riesgo if distancia_riesgo > 0 else 0.0
             precio_salida, razon = fila[f"precio_salida_{direccion}"], fila[f"razon_cierre_{direccion}"]
-            retorno_pct = posicion * (precio_salida - fila["y"]) / fila["y"]
+            retorno_pct = signo * (precio_salida - fila["y"]) / fila["y"]
             costo_slippage = self.slippage_pct * notional if posicion != self._posicion_previa else 0.0
             pnl = notional * retorno_pct - costo_slippage
 
@@ -178,6 +199,15 @@ class USDCLPTradingEnv(gym.Env):
         terminated = self._paso >= len(self.df)
         obs = self._obs() if not terminated else np.zeros(len(FEATURES_ESTADO), dtype=np.float32)
         reward = pnl / capital_previo  # % de retorno sobre el capital vigente - mas estable para entrenar que dolares crudos, pero ya refleja apalancamiento y TP/SL reales
+        if self.modo_recompensa == "exceso_bh":
+            # Issue #2, propuesta 3: exceso de retorno contra mantener la
+            # posicion sin apalancar (misma referencia que Buy-and-hold en
+            # 14_backtest_walkforward_gestion_riesgo.py) en vez de retorno %
+            # crudo - incentiva buscar una ventaja diferencial real, no solo
+            # evitar perder (con recompensa cruda, "no operar" ya da reward=0,
+            # que empata con un mercado plano en vez de perder frente a el).
+            retorno_bh = (fila["y_next"] - fila["y"]) / fila["y"]
+            reward -= retorno_bh
         info = {"posicion": posicion, "pnl": pnl, "notional": notional, "razon_cierre": razon, "capital": self.capital}
         return obs, float(reward), terminated, False, info
 

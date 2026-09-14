@@ -221,6 +221,40 @@ El hallazgo central (sin edge direccional real, un agente que entiende el riesgo
 3. **Probar con comisión real distinta de cero**: cuantificar cuánto empeoraría el umbral simple (68 operaciones) con una comisión de, por ejemplo, 0.02-0.05% por operación — barato de correr, cierra un cabo suelto de 9.6.
 4. **Considerar la "no-operación" como resultado de portfolio válido**: mostrar honestamente que un agente bien diseñado puede concluir "no juegues" es, en sí mismo, un punto de portfolio interesante — distinto (y más raro de ver) que la mayoría de los proyectos de trading con RL que solo muestran el caso en que "funcionó".
 
+### 9.9 Extensión: resultados del Issue #2 (mejoras al agente)
+
+A partir de la propuesta 1 de la sección 9.8 se probaron 3 cambios técnicos **independientes** sobre el mismo agente/entorno de la sección 9.3-9.4, cada uno evaluado por separado y combinados contra el mismo walk-forward de 5 ventanas × 20 semanas:
+
+1. **Más exploración**: `ent_coef=0.02` en PPO (default de stable-baselines3: 0.0).
+2. **Acción continua**: `action_space` de `Discrete(3)` a `Box(-1, 1)`, con el tamaño de la apuesta (notional) escalando proporcional a la magnitud de la acción en vez de solo largo/plano/corto.
+3. **Reward shaping**: recompensa como exceso de retorno sobre buy-and-hold sin apalancar, en vez de retorno % crudo.
+
+| Estrategia | Retorno total | Sharpe anualizado | Max drawdown | Win rate | Operaciones |
+|---|---|---|---|---|---|
+| Buy-and-hold (sin apalancar) | -0.9% | ~0.00 | -15.4% | 47.0% | 100 |
+| Umbral simple (Opción A) | -16.0% | -0.94 | -20.8% | 51.5% | 68 |
+| **PPO base** (referencia 9.4) | **0.0%** | — | 0.0% | — | **0** |
+| **PPO + ent_coef alto** | **0.0%** | — | 0.0% | — | **0** |
+| **PPO + exceso sobre buy-and-hold** | **0.0%** | — | 0.0% | — | **0** |
+| PPO + acción continua | -16.8% | -1.51 | -20.6% | 31.0% | 100 |
+| PPO + las 3 combinadas | -16.8% | -1.36 | -21.0% | 33.0% | 100 |
+
+![Métricas por configuración](../datos/resultados/mejoras_rl_metricas_por_estrategia.png)
+![Curva de capital por configuración](../datos/resultados/mejoras_rl_curva_capital.png)
+
+**El resultado es tan honesto de reportar como el de la sección 9.4, y refuerza la misma conclusión en vez de contradecirla.** Más exploración (`ent_coef`) y penalizar la inacción (`exceso_bh`) **no movieron la aguja en absoluto**: con las mismas 5 ventanas y semilla, el agente converge exactamente a la misma política degenerada de no operar nunca (capital final $100.00 en las tres filas, sin diferencia siquiera en el tercer decimal) — la política de "plano" es un atractor lo bastante fuerte en este entorno como para que ni un bonus de entropía 20× más alto que el default ni una recompensa que explícitamente castiga quedarse afuera del mercado lo saquen de ahí en 100.000 pasos de entrenamiento.
+
+Solo la **acción continua** — un cambio estructural, no un hiperparámetro — rompe el atractor y obliga al agente a operar (100 operaciones sobre 100 semanas). Pero operar no ayuda: pierde -16.8%, peor que el umbral simple (-16.0%) y muy por debajo de buy-and-hold (-0.9%), con el Sharpe más negativo de las 7 filas de la tabla. Combinar las 3 mejoras da un resultado prácticamente idéntico a la acción continua sola (-16.8% vs. -16.8%, Sharpe -1.36 vs. -1.51) — evidencia de que `ent_coef` y el reward shaping no aportan nada una vez que el espacio de acción deja de ser el cuello de botella; toda la diferencia la explica forzar al agente a apostar.
+
+**Lectura**: esto no es evidencia de que el diseño del agente esté mal — es evidencia de que el diagnóstico de la sección 9.5 era correcto. Cuando se le impide "no jugar", el agente no encuentra una forma rentable de jugar, porque la señal disponible (|r|<0.11 en las 7 variables del estado) no alcanza para eso. Forzar la acción convierte una abstención racional en una pérdida activa. La propuesta 1 de la sección 9.8 — invertir en mejor señal antes que en mejor agente — queda más respaldada después de este experimento, no menos.
+
+**Limitaciones de este experimento puntual**: un solo valor de `ent_coef` (0.02) y una sola semilla (42, la misma del resto del proyecto) — no se descarta que otro valor de `ent_coef` o promediar sobre varias semillas cambie el resultado del agente base, aunque la acción continua ya muestra que el problema no es exploración insuficiente sino ausencia de señal explotable.
+
+### 9.10 Tareas pendientes en el Issue #2
+
+- [ ] Cerrar la Tarea de Notion y el Issue #2 con este hallazgo documentado.
+- [ ] Evaluar si vale la pena la Tarea "Entrenar agente de RL con datos multi-activo" dado este resultado — si el cuello de botella es la señal y no el agente, entrenar sobre más pares FX (sin nueva señal, solo más datos del mismo tipo de variables) puede no cambiar la conclusión; podría valer más la pena priorizar la propuesta 1 de 9.8 (features nuevas) antes de esa Tarea.
+
 ## Reproducibilidad
 
-Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` a `16` para la extensión de trading con RL — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
+Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` a `17` para la extensión de trading con RL — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
