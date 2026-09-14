@@ -298,4 +298,37 @@ Esto responde la pregunta (a) de arriba: la política de "no operar" del PPO no 
 
 **Caveat de datos**: la tasa de Chile usada es un proxy (tasa interbancaria a 3 meses, serie OECD MEI vía FRED), no la TPM oficial del Banco Central de Chile, y tiene rezago de publicación de 2-4 meses — los meses más recientes del dataset quedan con el último valor conocido (forward-fill), no el dato real de esa semana.
 
+### 9.12 Radar-baseline Tier 1: ¿momentum o Differential Sharpe Ratio destraban al agente?
+
+Aunque el Tier 0/2 (9.11) ya sugería que ninguna variable nueva iba a cambiar la conclusión, se completó igual el Tier 1 — mismo criterio que el Issue #2: agotar variantes razonables con evidencia real antes de concluir, no asumir el resultado de antemano. Dos cambios, esta vez sin necesitar datos externos (`20_agente_rl_ronda2.py`, mismo walk-forward de 5 ventanas × 20 semanas):
+
+1. **Momentum en el estado**: agrega `mom_4s`/`mom_12s` (retorno normalizado por volatilidad a 4 y 12 semanas — ancla: Moskowitz, Ooi & Pedersen 2012) a las 7 features existentes.
+2. **Differential Sharpe Ratio como recompensa**: reward recursivo de Moody & Saffell (1998) que penaliza la varianza contra el propio historial reciente del agente, en vez de retorno % crudo o exceso sobre buy-and-hold (ya probado en 9.9).
+
+| Estrategia | Retorno total | Sharpe anualizado | Max drawdown | Win rate | Operaciones |
+|---|---|---|---|---|---|
+| Buy-and-hold | -0.9% | 0.00 | -15.4% | 47.0% | 100 |
+| **PPO + momentum** | **-3.1%** | **-0.73** | **-3.1%** | 0.0% | **2** |
+| Umbral simple (Opción A) | -16.0% | -0.94 | -20.8% | 51.5% | 68 |
+| **PPO base / + DSR reward / + momentum + DSR** | **0.0%** | — | 0.0% | — | **0** |
+
+![Curva de capital: Tier 1](../datos/resultados/ronda2_rl_curva_capital.png)
+![Métricas por estrategia: Tier 1](../datos/resultados/ronda2_rl_metricas_por_estrategia.png)
+
+**Momentum es la única de las 6 variantes probadas hasta ahora (3 del Issue #2 + Kelly + 2 de esta ronda) que mueve al agente sin forzarlo estructuralmente** (a diferencia de la acción continua de 9.9, que lo obliga a operar cada semana). Con acción discreta y recompensa cruda, agregar `mom_4s`/`mom_12s` al estado hizo que el agente tomara **2 operaciones** en 100 semanas de test — pocas, pero ya no cero. El resultado de esas 2 operaciones fue negativo (-3.1%, peor que buy-and-hold) pero muchísimo menos negativo que forzar la acción continua (-16.8%) — es un agente que, con una variable más, encontró 2 momentos donde valía la pena arriesgarse según su propio criterio, no una política degenerada. Es un cambio de comportamiento cualitativamente distinto a todo lo probado hasta ahora, aunque el resultado económico siga sin ser positivo.
+
+**El Differential Sharpe Ratio, en cambio, no lo destraba — ni solo ni combinado con momentum.** Ambas configuraciones con `modo_recompensa="dsr"` convergen a 0 operaciones, exactamente como PPO base. Una hipótesis (no verificada, queda para el futuro): el DSR es una señal muy ruidosa al principio del episodio (la varianza del denominador `B_t - A_t²` es inestable en los primeros pasos — ver nota en `11_entorno_trading_rl.py`), lo que podría hacer que el agente aprenda a evitar esa fuente de ruido quedándose plano en vez de aprovechar la señal de varianza real que el DSR busca capturar.
+
+**Lectura acumulada de 9.9 + 9.11 + 9.12**: de 6 variantes independientes probadas sobre el mismo agente/entorno (más exploración, acción continua, exceso sobre buy-and-hold, Kelly, momentum, DSR), solo dos cambiaron el comportamiento del agente (acción continua y momentum) y ambas perdieron plata igual — ninguna encontró una política rentable. La propuesta 1 de la sección 9.8 queda validada con evidencia, no solo con intuición: **el cuello de botella de este proyecto, a la escala y con los datos disponibles hoy, es la señal — no el agente, no el reward, no el espacio de acción.**
+
+### 9.13 Decisiones pendientes (no tomadas en automático)
+
+Este tramo (9.11-9.12) se corrió sin supervisión directa — se priorizaron los ítems de la hoja de ruta con menor costo/reversibilidad (Tier 0-2: sin datos nuevos que conseguir, o datos públicos gratis; cambios acotados al mismo agente/entorno) y se dejaron sin empezar los de mayor alcance, para que la decisión de invertir ahí sea explícita:
+
+- [ ] **Tier 3 — multi-pares FX** (la Tarea original de Notion, ampliada con el hallazgo de X-Trend del radar): entrenar sobre un panel de varios pares en vez de USD/CLP aislado. Cautela documentada en el radar: el único estudio de transfer learning FX directo encontrado dio resultado negativo — no asumir que "más activos" resuelve esto solo, pero tampoco descartarlo sin probarlo, dado que el mecanismo de X-Trend (contexto compartido, no transfer secuencial) es distinto.
+- [ ] **Tier 4 — arquitectura cross-attention multi-activo (X-Trend)**: la evidencia más fuerte de mejora en activos con poca historia, pero implica repensar el pipeline completo — solo si Tier 3 no alcanza.
+- [ ] Repetir el chequeo de correlación de cobre/tasas (9.11) a frecuencia diaria y mensual — Ferraro, Rogoff & Rossi (2015) encuentran el efecto cobre-FX a diario, no a la frecuencia semanal que se probó acá. Quedó como sugerencia de sesión (chip), no iniciada.
+- [ ] Decidir si este trabajo (9.11-9.12) se formaliza como un Issue de GitHub retroactivo o se documenta solo en el paper — no se abrió Issue nuevo porque no había uno para el radar-baseline en sí, a diferencia de los Issues #1/#2.
+- [ ] Actualizar/cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" a la luz de este hallazgo (sigue pendiente, sin tocar).
+
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` a `17` para la extensión de trading con RL — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.

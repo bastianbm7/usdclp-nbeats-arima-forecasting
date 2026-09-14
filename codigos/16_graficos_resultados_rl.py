@@ -190,7 +190,11 @@ def graficar_curva_capital_ronda2():
 
 
 def graficar_metricas_ronda2():
+    # ronda2_rl_metricas.csv trae ademas las filas del Issue #2 (referencia
+    # completa) - aca solo se grafica el subset curado en COLOR_RONDA2 para
+    # que el grafico sea legible (comparacion directa, no la tabla entera).
     tabla = pd.read_csv(f"{RESULTADOS_DIR}/ronda2_rl_metricas.csv")
+    tabla = tabla[tabla["estrategia"].isin(COLOR_RONDA2)].reset_index(drop=True)
     metricas = [("retorno_total_%", "Retorno total (%)"), ("sharpe_anualizado", "Sharpe anualizado"),
                 ("max_drawdown_%", "Max drawdown (%)"), ("win_rate_%", "Win rate (%)")]
 
