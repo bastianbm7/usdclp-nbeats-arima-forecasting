@@ -99,6 +99,12 @@ Los análisis anteriores entrenan una vez con datos históricos y nunca más se 
 
 **Por qué esto importa para el proyecto en general**: el mensaje no es "el online learning es mejor" ni "es peor" — es que **ayuda mucho en algunos combos (semanal, sobre todo) y puede volverse inestable en otros (mensual h=3) de forma que más cómputo no arregla**. Eso es más honesto que optimizar solo la configuración que se ve mejor y mostrar únicamente esa.
 
+## Extensión: estrategia de trading con Reinforcement Learning
+
+El forecasting de arriba responde si un modelo predice bien el precio. Una extensión separada (dentro del mismo repo, [Issue #1](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/1)) responde una pregunta distinta: **¿ese forecast sirve para tomar decisiones de trading que ganen plata con apalancamiento y riesgo real?** Se probó un agente PPO (`gymnasium` + `stable-baselines3`, con [FinRL](https://github.com/AI4Finance-Foundation/FinRL) como ancla metodológica) con gestión de riesgo real (capital de $100, tamaño de posición vía risk sizing, stop-loss con trailing basado en volatilidad GARCH, take-profit en el forecast de N-HiTS).
+
+**Hallazgo, walk-forward de 100 semanas out-of-sample**: ninguna estrategia activa le ganó a mantener la posición sin apalancar (buy-and-hold: -0.9%; umbral simple: -16.0%; PPO: -52.2% con recompensa simplificada). Al reentrenar al agente con la **economía real** (apalancamiento + TP/SL) como recompensa, en vez de una versión simplificada, aprendió a **no operar nunca** — una respuesta racional dado que ninguna de las 7 variables del estado supera |r|=0.11 de correlación con el retorno real siguiente. 📄 **[Ver el detalle completo, con gráficos, en la sección 9 del paper](reportes/paper.md#9-extensión-estrategia-de-trading-con-reinforcement-learning-septiembre-2026)**.
+
 ## Datos
 
 Tipo de cambio USD/CLP, serie diaria descargada con [`yfinance`](https://github.com/ranaroussi/yfinance) (ticker `CLP=X`, fuente: Yahoo Finance). Se guarda una copia cruda en `datos/bases/` para reproducibilidad exacta (no depender de que Yahoo siga sirviendo el mismo histórico).
@@ -114,7 +120,15 @@ codigos/
 ├── 05_visualizacion.py          # predicción vs. real + intervalos + baseline superpuesto (diario)
 ├── 06_analisis_mensual.py       # mismo pipeline completo (datos+baseline+NN+métricas+gráficos), resampleado a mensual
 ├── 07_analisis_anual.py         # mismo pipeline sin NN (no hay data suficiente), resampleado a anual
-└── 08_online_learning.py        # refit=True (warm start) x 3 escalas x horizontes 1/2/3 pasos
+├── 08_online_learning.py        # refit=True (warm start) x 3 escalas x horizontes 1/2/3 pasos
+├── 09_comparacion_modelos_volatilidad.py  # Naive/media movil/GARCH/EGARCH walk-forward, elige el modelo de volatilidad
+├── 10_generar_dataset_rl.py     # dataset semanal (forecast N-HiTS + volatilidad GARCH + MACD/RSI/min-max) para el agente
+├── 11_entorno_trading_rl.py     # entorno Gym (estado/accion/recompensa con gestion de riesgo real, TP/SL con trailing stop)
+├── 12_entrenar_agente_rl.py     # chequeo rapido: un solo split train/test (superado por 14)
+├── 13_backtest_estrategia_rl.py # backtest del chequeo rapido de 12 (superado por 14)
+├── 14_backtest_walkforward_gestion_riesgo.py  # walk-forward real (5 ventanas), PPO vs buy-and-hold vs umbral simple
+├── 15_analisis_features.py      # cuanto se correlaciona cada variable del estado con el retorno futuro real
+└── 16_graficos_resultados_rl.py # graficos finales de la extension de RL (lee los CSV ya generados, no recalcula)
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
@@ -137,3 +151,4 @@ reportes/
 
 - Oreshkin et al., *N-BEATS: Neural basis expansion analysis for interpretable time series forecasting*, ICLR 2020 — [arXiv:1905.10437](https://arxiv.org/abs/1905.10437)
 - Challu et al., *N-HiTS: Neural Hierarchical Interpolation for Time Series Forecasting* — [arXiv:2201.12886](https://arxiv.org/abs/2201.12886)
+- Liu et al., *FinRL: Deep Reinforcement Learning Framework for Automated Trading*, ancla de la extensión de RL (sección 9 del paper) — [arXiv:2111.09395](https://arxiv.org/abs/2111.09395)

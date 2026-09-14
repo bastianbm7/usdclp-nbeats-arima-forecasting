@@ -1,27 +1,5 @@
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:94: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:160: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:137: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
   fecha_ini, fecha_fin = resultado_ppo["ds"].min(), resultado_ppo["ds"].max() + pd.Timedelta(weeks=1)
-C:\Users\basti\Documents\modelo_de_trabajo\repositorios\portfolio\usdclp-nbeats-arima-forecasting\codigos\14_backtest_walkforward_gestion_riesgo.py:172: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
-  fecha_salida = op["ds"] + pd.Timedelta(days=3)  # aprox., solo para separar visualmente entrada/salida
 Dataset: 348 semanas. Walk-forward: 5 ventanas x 20 semanas de test cada una (100 semanas de test en total)
 
 --- Ventana 1/5: train=248 semanas, test=2024-09-22 a 2025-02-02 ---
@@ -34,5 +12,5 @@ Dataset: 348 semanas. Walk-forward: 5 ventanas x 20 semanas de test cada una (10
 
               estrategia  capital_final  retorno_total_%  sharpe_anualizado  max_drawdown_%  win_rate_%  operaciones
             Buy-and-hold      99.130448        -0.869552           0.002220      -15.443312   47.000000          100
-Umbral simple (Opcion A)      81.174871       -18.825129          -1.087577      -22.735000   51.470588           68
-                PPO (RL)      47.841827       -52.158173          -3.792258      -53.158302   29.000000          100
+Umbral simple (Opcion A)      84.029255       -15.970745          -0.943048      -20.825995   51.470588           68
+                PPO (RL)     100.000000         0.000000                NaN        0.000000         NaN            0

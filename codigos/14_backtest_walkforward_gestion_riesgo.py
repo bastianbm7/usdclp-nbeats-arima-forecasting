@@ -64,50 +64,27 @@ def posiciones_umbral_simple(df_test, umbral=UMBRAL_SIMPLE):
     return list(np.where(forecast_rel > umbral, 1.0, np.where(forecast_rel < -umbral, -1.0, 0.0)))
 
 
-def precios_diarios_entre(diario, fecha_inicio, fecha_fin):
-    mask = (diario["ds"] > fecha_inicio) & (diario["ds"] <= fecha_fin)
-    return diario.loc[mask, "y"].tolist()
-
-
-def ejecutar_operacion(take_profit, stop_loss, posicion, precios_diarios, precio_cierre_semana):
-    for precio_dia in precios_diarios:
-        if posicion > 0:
-            if precio_dia >= take_profit:
-                return take_profit, "take_profit"
-            if precio_dia <= stop_loss:
-                return stop_loss, "stop_loss"
-        else:
-            if precio_dia <= take_profit:
-                return take_profit, "take_profit"
-            if precio_dia >= stop_loss:
-                return stop_loss, "stop_loss"
-    return precio_cierre_semana, "cierre_semana"
-
-
 def simular_con_gestion_riesgo(df_test, diario, posiciones, nombre_estrategia, capital_inicial=CAPITAL_INICIAL):
+    # Usa el mismo precomputo de salidas TP/SL que el entorno (11_entorno_trading_rl.py)
+    # para que la evaluacion sea matematicamente identica a lo que el agente
+    # entreno a optimizar - no una segunda implementacion que podria divergir.
+    df_test = entorno_mod.precomputar_salidas_tp_sl(df_test.reset_index(drop=True), diario, K_STOP_LOSS)
+
     capital = capital_inicial
     posicion_previa = 0.0
     filas = []
-    for i, fila in df_test.reset_index(drop=True).iterrows():
+    for i, fila in df_test.iterrows():
         posicion = posiciones[i]
         entrada, vol, take_profit = fila["y"], fila["vol_garch"], fila["nhits_h1"]
-        fecha_fin_semana = fila["ds"] + pd.Timedelta(weeks=1)
 
-        if posicion > 0:
-            stop_loss = entrada * (1 - K_STOP_LOSS * vol)
-            distancia_riesgo = (entrada - stop_loss) / entrada
-        elif posicion < 0:
-            stop_loss = entrada * (1 + K_STOP_LOSS * vol)
-            distancia_riesgo = (stop_loss - entrada) / entrada
+        if posicion == 0:
+            notional, pnl, razon, precio_salida, stop_loss = 0.0, 0.0, "plano", entrada, np.nan
         else:
-            stop_loss, distancia_riesgo = np.nan, 0.0
-
-        if posicion == 0 or distancia_riesgo <= 0:
-            notional, pnl, razon, precio_salida = 0.0, 0.0, "plano", entrada
-        else:
-            precios_semana = precios_diarios_entre(diario, fila["ds"], fecha_fin_semana)
-            notional = (RIESGO_MAX_PCT * capital) / distancia_riesgo
-            precio_salida, razon = ejecutar_operacion(take_profit, stop_loss, posicion, precios_semana, fila["y_next"])
+            direccion = "largo" if posicion > 0 else "corto"
+            distancia_riesgo = K_STOP_LOSS * vol
+            stop_loss = fila[f"stop_loss_{direccion}"]
+            precio_salida, razon = fila[f"precio_salida_{direccion}"], fila[f"razon_cierre_{direccion}"]
+            notional = (RIESGO_MAX_PCT * capital) / distancia_riesgo if distancia_riesgo > 0 else 0.0
             retorno_pct = posicion * (precio_salida - entrada) / entrada
             costo_slippage = SLIPPAGE_PCT * notional if posicion != posicion_previa else 0.0
             pnl = notional * retorno_pct - costo_slippage
@@ -163,7 +140,7 @@ def graficar_operaciones(resultado_ppo, diario, path_salida):
     fig, ax = plt.subplots(figsize=(14, 6))
     ax.plot(precios["ds"], precios["y"], color="black", linewidth=1, label="USD/CLP (diario)", zorder=1)
 
-    colores_razon = {"take_profit": "green", "stop_loss": "red", "cierre_semana": "gray"}
+    colores_razon = {"take_profit": "green", "trailing_stop": "orange", "stop_loss": "red", "cierre_semana": "gray"}
     for _, op in resultado_ppo.iterrows():
         if op["posicion"] == 0:
             continue
@@ -172,7 +149,7 @@ def graficar_operaciones(resultado_ppo, diario, path_salida):
         fecha_salida = op["ds"] + pd.Timedelta(days=3)  # aprox., solo para separar visualmente entrada/salida
         ax.scatter(fecha_salida, op["precio_salida"], marker="o", color=colores_razon[op["razon_cierre"]], s=40, zorder=3)
 
-    for etiqueta, color in [("Entrada larga (▲) / corta (▼)", "blue"), ("Salida: take-profit", "green"), ("Salida: stop-loss", "red"), ("Salida: cierre de semana", "gray")]:
+    for etiqueta, color in [("Entrada larga (▲) / corta (▼)", "blue"), ("Salida: take-profit", "green"), ("Salida: trailing stop", "orange"), ("Salida: stop-loss", "red"), ("Salida: cierre de semana", "gray")]:
         ax.scatter([], [], color=color, label=etiqueta)
     ax.legend(loc="upper left", fontsize=8)
     ax.set_title("Agente PPO: puntos de entrada/salida sobre el holdout walk-forward completo")
