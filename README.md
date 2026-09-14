@@ -103,7 +103,9 @@ Los análisis anteriores entrenan una vez con datos históricos y nunca más se 
 
 El forecasting de arriba responde si un modelo predice bien el precio. Una extensión separada (dentro del mismo repo, [Issue #1](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/1)) responde una pregunta distinta: **¿ese forecast sirve para tomar decisiones de trading que ganen plata con apalancamiento y riesgo real?** Se probó un agente PPO (`gymnasium` + `stable-baselines3`, con [FinRL](https://github.com/AI4Finance-Foundation/FinRL) como ancla metodológica) con gestión de riesgo real (capital de $100, tamaño de posición vía risk sizing, stop-loss con trailing basado en volatilidad GARCH, take-profit en el forecast de N-HiTS).
 
-**Hallazgo, walk-forward de 100 semanas out-of-sample**: ninguna estrategia activa le ganó a mantener la posición sin apalancar (buy-and-hold: -0.9%; umbral simple: -16.0%; PPO: -52.2% con recompensa simplificada). Al reentrenar al agente con la **economía real** (apalancamiento + TP/SL) como recompensa, en vez de una versión simplificada, aprendió a **no operar nunca** — una respuesta racional dado que ninguna de las 7 variables del estado supera |r|=0.11 de correlación con el retorno real siguiente. 📄 **[Ver el detalle completo, con gráficos, en la sección 9 del paper](reportes/paper.md#9-extensión-estrategia-de-trading-con-reinforcement-learning-septiembre-2026)**.
+**Hallazgo, walk-forward de 100 semanas out-of-sample**: ninguna estrategia activa le ganó a mantener la posición sin apalancar (buy-and-hold: -0.9%; umbral simple: -16.0%; PPO: -52.2% con recompensa simplificada). Al reentrenar al agente con la **economía real** (apalancamiento + TP/SL) como recompensa, en vez de una versión simplificada, aprendió a **no operar nunca** — una respuesta racional dado que ninguna de las 7 variables del estado supera |r|=0.11 de correlación con el retorno real siguiente.
+
+**Issue #2 — ¿se puede destrabar al agente?**: se probaron 3 cambios independientes (más exploración vía `ent_coef`, acción continua en vez de discreta, recompensa como exceso sobre buy-and-hold). Más exploración y reward shaping **no cambiaron nada** — el agente converge a la política de no operar de forma idéntica en las tres configuraciones. Acción continua sí lo obliga a operar, pero pierde -16.8% — peor que no operar. El cuello de botella confirmado es la señal, no el agente. 📄 **[Ver el detalle completo, con gráficos, en la sección 9 del paper](reportes/paper.md#9-extensión-estrategia-de-trading-con-reinforcement-learning-septiembre-2026)**.
 
 ## Datos
 
@@ -128,7 +130,8 @@ codigos/
 ├── 13_backtest_estrategia_rl.py # backtest del chequeo rapido de 12 (superado por 14)
 ├── 14_backtest_walkforward_gestion_riesgo.py  # walk-forward real (5 ventanas), PPO vs buy-and-hold vs umbral simple
 ├── 15_analisis_features.py      # cuanto se correlaciona cada variable del estado con el retorno futuro real
-└── 16_graficos_resultados_rl.py # graficos finales de la extension de RL (lee los CSV ya generados, no recalcula)
+├── 16_graficos_resultados_rl.py # graficos finales de la extension de RL (lee los CSV ya generados, no recalcula)
+└── 17_agente_rl_mejoras.py      # Issue #2: ent_coef, accion continua y reward shaping vs. buy-and-hold, solos y combinados
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
