@@ -1,0 +1,5 @@
+estrategia,capital_final,retorno_total_%,sharpe_anualizado,max_drawdown_%,win_rate_%,operaciones
+Buy-and-hold,99.1304477892764,-0.8695522107236009,0.002219538170783,-15.443311608795652,47.0,100
+Umbral simple (Opcion A),84.02925462331585,-15.970745376684148,-0.9430475322612571,-20.825995342843274,51.47058823529412,68
+PPO multi-activo (CLP+MXN+BRL+COP),100.0,0.0,,0.0,,0
+PPO (RL),100.0,0.0,,0.0,,0
