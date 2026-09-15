@@ -344,16 +344,65 @@ La sección 9.11 dejó un cabo suelto explícito: Ferraro, Rogoff & Rossi (2015)
 
 **Lectura**: esto no cambia la conclusión de que el agente semanal actual no tiene señal explotable — sigue sin tenerla, con las variables y a la frecuencia que opera hoy. Pero sí cambia el diagnóstico de fondo: el problema no es necesariamente que "USD/CLP no tiene edge explotable en ningún lado" — es que, a la frecuencia semanal, la señal de cobre (que sí existe a diario) ya se diluyó. Antes de invertir en Tier 3/4 (multi-activo, arquitecturas nuevas), validar el timestamp y, si se confirma, evaluar si vale la pena una versión diaria del agente es probablemente la pista de mayor retorno esperado por hora invertida de todo lo que se investigó esta noche — pero es una decisión de alcance (cambiar la escala de todo el pipeline) que le corresponde a Bastián, no algo para decidir en automático.
 
-### 9.14 Decisiones pendientes (no tomadas en automático)
+### 9.14 Validación del hallazgo diario: timestamp limpio, backtest rentable, y por qué "más monedas" no ayudó
 
-Este tramo (9.11-9.13) se corrió sin supervisión directa — se priorizaron los ítems de la hoja de ruta con menor costo/reversibilidad (Tier 0-2: sin datos nuevos que conseguir, o datos públicos gratis; cambios acotados al mismo agente/entorno) y se dejaron sin empezar los de mayor alcance, para que la decisión de invertir ahí sea explícita:
+Bastián pidió validar el caveat de timestamp de 9.13 aunque resultara válido, probar si la señal es rentable en un backtest real, y ampliar el dataset a un panel de al menos 10 pares de forex — los tres pasos siguientes.
 
-- [ ] **Tier 3 — multi-pares FX** (la Tarea original de Notion, ampliada con el hallazgo de X-Trend del radar): entrenar sobre un panel de varios pares en vez de USD/CLP aislado. Cautela documentada en el radar: el único estudio de transfer learning FX directo encontrado dio resultado negativo — no asumir que "más activos" resuelve esto solo, pero tampoco descartarlo sin probarlo, dado que el mecanismo de X-Trend (contexto compartido, no transfer secuencial) es distinto.
-- [ ] **Tier 4 — arquitectura cross-attention multi-activo (X-Trend)**: la evidencia más fuerte de mejora en activos con poca historia, pero implica repensar el pipeline completo — solo si Tier 3 no alcanza.
-- [x] Repetir el chequeo de correlación de cobre/tasas (9.11) a frecuencia diaria y mensual — hecho, ver 9.13. **Resultado inesperado: a frecuencia diaria, `copper_ret_1d` sí supera el umbral (|r|=0.26, más del doble de 0.11)** — la pista más prometedora de toda la noche, pero requiere validación adicional antes de construir nada sobre ella (ver caveat de timestamp en 9.13).
-- [ ] Decidir si este trabajo (9.11-9.13) se formaliza como un Issue de GitHub retroactivo o se documenta solo en el paper — no se abrió Issue nuevo porque no había uno para el radar-baseline en sí, a diferencia de los Issues #1/#2.
-- [ ] **Nuevo, el más prometedor**: validar el timestamp exacto de cierre de `HG=F` (cobre, COMEX vía yfinance) contra el de `CLP=X` (USD/CLP, ver 01_obtener_datos.py) antes de confiar en el hallazgo de 9.14 — si los cierres no están bien alineados en el tiempo, la correlación diaria podría estar mezclando información contemporánea en vez de predictiva. Si se confirma que es genuinamente predictiva, evaluar si vale la pena un agente/estrategia a frecuencia diaria (no semanal) que use el retorno del cobre como feature principal — cambio de escala grande, no trivial de integrar al pipeline semanal actual.
-- [ ] Actualizar/cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" a la luz de este hallazgo (sigue pendiente, sin tocar).
+**Validación de timestamp**: en vez de reconstruir a mano el horario exacto de cierre de `HG=F` (COMEX, huso horario America/New_York) contra `CLP=X` (Europe/London en yfinance, con huecos de fin de semana por ser un par poco líquido), se usó una prueba más directa y decisiva — un escaneo de correlación por rezago:
+
+| Rezago (copper_ret en t vs. retorno CLP en t+rezago) | Correlación |
+|---|---|
+| -2 | -0.009 |
+| -1 | -0.050 |
+| **0 (mismo día)** | **-0.021** |
+| **+1 (predictivo, el usado en 9.13)** | **-0.254** |
+| +2 | -0.069 |
+| +3 | -0.032 |
+
+El efecto está **concentrado casi por completo en el rezago +1** — si hubiera contaminación por solapamiento de cierres (información del mismo día filtrándose como si fuera predictiva), se esperaría un efecto fuerte también en el rezago 0. La firma es la de un lead-lag genuino de un día, no un artefacto de alineación de timestamps. No es una auditoría exhaustiva al minuto, pero descarta el mecanismo específico de contaminación que se sospechaba.
+
+**Backtest de rentabilidad** (`22_kelly_diario_cobre.py`, walk-forward de 5 ventanas × 60 días = 300 días de test, ~14 meses):
+
+| Estrategia | Retorno total | Sharpe anualizado | Max drawdown | Operaciones |
+|---|---|---|---|---|
+| **Kelly diario (con cobre)** | **+86.2%** | **4.57** | **-3.5%** | 300 |
+| Umbral cobre (solo signo, sin regresión) | +83.5% | 4.44 | -3.4% | 290 |
+| Kelly diario (sin cobre) | +6.0% | 0.47 | -9.7% | 300 |
+| Buy-and-hold | -2.7% | -0.13 | -15.4% | 100 |
+
+![Curva de capital: Kelly diario con/sin cobre](../datos/resultados/kelly_diario_cobre_curva_capital.png)
+
+Sharpe >4 es un número que hay que mirar con sospecha, no con entusiasmo automático — se verificó que no viene de una sola ventana con suerte: las 5 ventanas del walk-forward son todas positivas individualmente (ganancia de $5.6 a $23.5 cada una), y que la señal simple ("umbral cobre", sin regresión, solo el signo de `copper_ret_1d`) rinde casi lo mismo que la versión con regresión (Kelly) — la ventaja viene genuinamente de la dirección del cobre, no de ruido que la regresión está sobreajustando. Nota de método: a diferencia del backtest semanal (14), esto NO reproduce el trailing-stop/take-profit intradía — a frecuencia diaria no hay datos más finos que el cierre para chequear eso, así que se simula cierre-a-cierre con el mismo costo de slippage. El periodo de test cubre 2025-07 a 2026-09 — los últimos ~14 meses del dataset, no una muestra aleatoria de toda la historia; no se descarta que el resultado sea parcialmente específico del régimen reciente de cobre (una tendencia fuerte y sostenida) y no necesariamente igual de fuerte en periodos de cobre lateral.
+
+**Panel de 13 pares de forex** (`23_dataset_multi_par_diario.py`, dataset nuevo en `datos/bases/panel_fx_diario.csv`): CLP, MXN, BRL, COP, PEN, ZAR, CAD, AUD, NZD (economías commodity — cobre, petróleo, hierro, lácteos, oro) más JPY, CHF, EUR, GBP (no-commodity, grupo de comparación). Nota técnica: al descargar estos pares frescos desde yfinance apareció el mismo bug de ticks corruptos de un solo día ya documentado en `01_obtener_datos.py` para CLP=X (ej. un valor de "5.46" en vez de ~544) — apareció también en COP=X (22 días), PEN=X, ZAR=X y CHF=X, y se corrigió reusando la misma función `limpiar_ticks_erroneos`, no una nueva.
+
+![Correlación de cobre por par](../datos/resultados/panel_fx_correlacion_cobre_por_par.png)
+
+**El efecto generaliza, y de forma que confirma la teoría en vez de contradecirla**: las 3 monedas commodity más "puras" del panel (AUD, NZD, CAD — economías mineras/agrícolas clásicas) muestran la correlación **más fuerte** de las 13 (0.31 a 0.37, más alta que la propia CLP en 0.25), y USD/JPY (refugio, la menos "commodity" de todas) muestra la **más débil** (0.02) — el patrón se ordena casi exactamente como predice Chen & Rogoff (2003). Matices honestos: GBP/EUR (no-commodity) igual muestran correlación moderada (0.25/0.22) — probablemente un factor más amplio de "riesgo-on / debilidad del dólar" que el cobre también capta, no solo el canal específico de materias primas; y PEN (cobre, como CLP) sale sorprendentemente bajo (0.06) — posible efecto de que el Banco Central de Perú interviene el tipo de cambio activamente, amortiguando la respuesta diaria.
+
+**¿Ayuda entrenar con el panel completo en vez de solo la historia de CLP?** Se probó, sobre el mismo test de CLP y el mismo esquema de walk-forward (5 reentrenos), un modelo entrenado únicamente con `copper_ret_1d`/`copper_mom_5d`/`retorno_1d`/`macd_rel`/`rsi_norm` de USD/CLP contra el mismo modelo entrenado con esas mismas features pero usando las filas de los **13 pares pooled** (más de 55.000 filas de entrenamiento vs. ~4.000):
+
+| Estrategia | Retorno total | Sharpe anualizado |
+|---|---|---|
+| Kelly diario (solo CLP) | +83.0% | 4.42 |
+| Kelly diario (panel pooled, 13 pares) | +67.9% | 3.77 |
+
+![Curva de capital: pooled vs. solo CLP](../datos/resultados/panel_fx_pooled_vs_single_curva_capital.png)
+
+**No ayudó — el modelo entrenado solo con CLP superó al pooled.** Tiene una explicación directa a la luz del gráfico anterior: la sensibilidad al cobre **varía bastante entre monedas** (0.02 a 0.37), así que agrupar todas las filas en una sola regresión "promedia" el coeficiente de CLP con el de monedas mucho más sensibles (AUD/CAD/NZD) y mucho menos sensibles (JPY) al cobre, diluyendo la calibración específica de CLP en vez de reforzarla. Es la segunda confirmación independiente (junto con la tesis de transfer learning EUR/USD→GBP/USD del radar-baseline, sección 9.11 del Artifact) de que sumar datos de otras monedas **no es una mejora automática** — hace falta un mecanismo más sofisticado que "pooling ingenuo" (ej. el contexto compartido vía cross-attention de X-Trend, que aprende a ponderar qué monedas son relevantes para cada una, en vez de promediar a todas por igual) para que más datos realmente ayuden.
+
+### 9.15 Decisiones pendientes (no tomadas en automático)
+
+Este tramo (9.11-9.14) mezcló trabajo sin supervisión directa (9.11-9.13, priorizando lo de menor costo/reversibilidad) con pasos pedidos explícitamente por Bastián después (9.14: validar el timestamp, probar rentabilidad, ampliar a un panel de 10+ pares). Lo que queda es de mayor alcance — construir algo nuevo, no solo investigar — y se deja explícito para que la decisión de invertir ahí sea de Bastián:
+
+- [x] Repetir el chequeo de correlación de cobre/tasas a frecuencia diaria y mensual (9.13) — hecho: `copper_ret_1d` supera el umbral por más del doble a diario, se diluye a semanal/mensual.
+- [x] Validar el timestamp de cierre de `HG=F` vs. `CLP=X` (9.14) — el escaneo de rezagos no muestra contaminación por solapamiento (efecto concentrado en el rezago +1, no en el 0).
+- [x] Probar rentabilidad en un backtest real (9.14) — +86.2% / Sharpe 4.57 en 300 días de test, consistente en las 5 ventanas, no explicado por una sola operación.
+- [x] Ampliar el dataset a un panel de forex de 10+ pares (9.14) — 13 pares en `datos/bases/panel_fx_diario.csv`. El efecto generaliza (más fuerte incluso en AUD/CAD/NZD que en CLP), pero pooling ingenuo del panel completo **empeora** el resultado específico de CLP frente a entrenar solo con su propia historia.
+- [ ] **La pregunta grande que sigue abierta**: ¿vale la pena una versión diaria del agente/pipeline (no solo un backtest de Kelly) que use `copper_ret_1d` como feature? Es un cambio de escala real — regenerar el dataset a diario, rediseñar el TP/SL (a diario no hay datos intradía para el trailing stop actual, se simplificaría a cierre-a-cierre como en 9.14), redefinir walk-forward — del tamaño del Issue #1 original. La evidencia de 9.14 lo respalda más que cualquier otra pista de esta investigación, pero el periodo de test (14 meses recientes) no cubre múltiples regímenes de cobre — valdría la pena, antes de comprometerse, correr el mismo backtest de 22 sobre ventanas históricas más antiguas (ej. 2015-2018, 2019-2021) para ver si el Sharpe se sostiene fuera del tramo alcista reciente.
+- [ ] Si se decide ir a diario: el panel de 13 pares ya construido (9.14) sirve como insumo directo para una versión "contexto compartido" real (estilo X-Trend) en vez de pooling ingenuo — encoder de tendencia entrenado sobre el panel, no una regresión OLS que promedia todo por igual.
+- [ ] Decidir si este trabajo (9.11-9.14) se formaliza como un Issue de GitHub retroactivo o se documenta solo en el paper — no se abrió Issue nuevo porque no había uno para el radar-baseline en sí, a diferencia de los Issues #1/#2.
+- [ ] Actualizar/cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" a la luz de este hallazgo (sigue pendiente, sin tocar) — el resultado de 9.14 sugiere que la versión "pooling simple" de esa Tarea probablemente no ayudaría; si se retoma, hacerlo con un mecanismo más parecido a X-Trend.
 
 ## Reproducibilidad
 

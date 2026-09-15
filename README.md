@@ -109,7 +109,9 @@ El forecasting de arriba responde si un modelo predice bien el precio. Una exten
 
 **Radar-baseline — ¿es la política de "no operar" un artefacto del entrenamiento, y hay una variable/técnica barata que ayude?**: se validó con Kelly criterion (sin entrenar ningún agente) si existe edge explotable — la respuesta es no: la fracción "óptima" de Kelly apalanca la deriva histórica de USD/CLP y pierde -51.5% a -52.9% fuera de muestra, peor que no operar. Se probaron además 5 variables nuevas ancladas en papers concretos (diferencial de tasas Chile-EE.UU., retorno/momentum del cobre, momentum clásico de USD/CLP) a frecuencia semanal — ninguna supera el umbral |r|=0.11 de la sección 9.5 — y 2 cambios al agente (momentum en el estado, reward Differential Sharpe Ratio). Momentum sí rompe el atractor de "no operar" (2 operaciones en 100 semanas, -3.1%) pero sigue sin ser rentable; DSR no lo destraba.
 
-**El hallazgo más fuerte de la noche apareció al repetir el chequeo de cobre a frecuencia diaria**: `copper_ret_1d` correlaciona -0.256 con el retorno del día siguiente de USD/CLP — más del doble del umbral que nada más superó, y con el signo económicamente correcto (cobre sube ⇒ CLP se aprecia). A frecuencia semanal (la que usa el agente hoy) ese mismo efecto se diluye a -0.08. Queda como la pista más prometedora, con un caveat real pendiente de validar (alineación de timestamps entre el cierre de `HG=F` y `CLP=X`) antes de construir nada sobre ella. De 6 variantes independientes probadas sobre el agente en total (Issue #2 + esta ronda), ninguna encontró una política rentable a la frecuencia y con los datos de hoy. 📄 **[Ver el detalle completo, con gráficos, en las secciones 9.11-9.13 del paper](reportes/paper.md#911-radar-baseline-validar-la-propuesta-1-de-98-antes-de-construir-nada-septiembre-2026)**.
+**El hallazgo más fuerte apareció al repetir el chequeo de cobre a frecuencia diaria**: `copper_ret_1d` correlaciona -0.256 con el retorno del día siguiente de USD/CLP — más del doble del umbral que nada más superó, con el signo económicamente correcto. A frecuencia semanal (la que usa el agente hoy) ese mismo efecto se diluye a -0.08.
+
+**Validado con evidencia, no solo con el número de correlación**: un escaneo de rezagos descarta que sea un artefacto de alineación de timestamps (el efecto está concentrado en el rezago de un día, no en el mismo día); un backtest walk-forward real da +86.2% de retorno y Sharpe 4.57 en 300 días de test, consistente en las 5 ventanas; y al ampliar a un panel de 13 pares de forex, el efecto **generaliza** — es incluso más fuerte en AUD/CAD/NZD (monedas commodity "puras") que en CLP, y casi nulo en JPY (refugio), exactamente el patrón que predice la teoría de "commodity currencies" (Chen & Rogoff 2003). Pero agrupar los 13 pares en un solo modelo (pooling ingenuo) **empeora** el resultado específico de CLP frente a entrenar solo con su propia historia — la sensibilidad al cobre varía demasiado entre monedas para promediarlas sin más. De 6 variantes independientes probadas sobre el agente semanal (Issue #2 + radar-baseline), ninguna encontró una política rentable a esa frecuencia — la señal diaria del cobre es la pista más sólida para una futura iteración a otra escala. 📄 **[Ver el detalle completo, con gráficos, en las secciones 9.11-9.14 del paper](reportes/paper.md#911-radar-baseline-validar-la-propuesta-1-de-98-antes-de-construir-nada-septiembre-2026)**.
 
 ## Datos
 
@@ -138,7 +140,10 @@ codigos/
 ├── 17_agente_rl_mejoras.py      # Issue #2: ent_coef, accion continua y reward shaping vs. buy-and-hold, solos y combinados
 ├── 18_kelly_validacion.py       # radar-baseline Tier 0: Kelly criterion (sin RL) como segundo veredicto sobre si hay edge
 ├── 19_features_nuevas_validacion.py  # radar-baseline Tier 2: correlacion + Kelly con tasas/cobre/momentum nuevos
-└── 20_agente_rl_ronda2.py       # radar-baseline Tier 1: PPO + momentum en el estado / reward Differential Sharpe Ratio
+├── 20_agente_rl_ronda2.py       # radar-baseline Tier 1: PPO + momentum en el estado / reward Differential Sharpe Ratio
+├── 21_features_nuevas_frecuencias.py  # repite el chequeo de correlacion de cobre/tasas a frecuencia diaria y mensual
+├── 22_kelly_diario_cobre.py     # valida timestamp (lag-scan) y backtest de rentabilidad del cobre a frecuencia diaria
+└── 23_dataset_multi_par_diario.py     # panel de 13 pares FX diarios + generalizacion del efecto cobre + pooled vs. solo CLP
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
