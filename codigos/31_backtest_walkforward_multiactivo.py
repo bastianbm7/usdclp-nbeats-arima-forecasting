@@ -83,6 +83,34 @@ def posiciones_multiactivo_para_clp(modelo, dfs_eval_por_par, diario_paths):
     return posiciones
 
 
+def evaluar_operaciones_por_par(modelo, dfs_train, dfs_por_par_completos, diario_paths, diarios_dfs, fecha_corte, ventana):
+    # Diagnostico adicional (no reemplaza la comparacion oficial, que sigue
+    # siendo solo-CLP): la MISMA politica ya entrenada, evaluada tambien sobre
+    # el tramo out-of-sample propio de MXN/BRL/COP (misma fecha de corte que
+    # CLP, sin look-ahead) - responde directo la pregunta del Issue #6 de si
+    # el atractor de "no operar nunca" es especifico de CLP o aparece igual
+    # en los otros 3 pares con la misma politica compartida.
+    filas = []
+    for par, df_par in dfs_por_par_completos.items():
+        df_test_par = df_par[df_par["ds"] >= fecha_corte].iloc[:N_TEST_POR_VENTANA].reset_index(drop=True)
+        if len(df_test_par) < 2:
+            continue
+        dfs_eval = dict(dfs_train)
+        dfs_eval[par] = df_test_par
+        env_eval = multi_env_mod.MultiFXTradingEnv(dfs_eval, diario_paths, par_fijo=par)
+        obs, _ = env_eval.reset()
+        posiciones, terminado = [], False
+        while not terminado:
+            accion, _ = modelo.predict(obs, deterministic=True)
+            posiciones.append(entorno_mod.POSICION_POR_ACCION[int(accion)])
+            obs, _, terminado, _, _ = env_eval.step(accion)
+        r = wf_mod.simular_con_gestion_riesgo(df_test_par, diarios_dfs[par], posiciones, f"diagnostico_{par}", capital_inicial=CAPITAL_INICIAL)
+        m = wf_mod.calcular_metricas(r, par)
+        m["ventana"] = ventana
+        filas.append(m)
+    return filas
+
+
 def graficar_comparacion(resultado_multi, ppo_solo_clp, path_salida):
     fig, ax = plt.subplots(figsize=(12, 5.5))
     ax.plot(resultado_multi["ds"], resultado_multi["capital"], label=NOMBRE_ESTRATEGIA, color="steelblue", linewidth=1.8)
@@ -104,9 +132,11 @@ if __name__ == "__main__":
 
     diario_clp = pd.read_csv(wf_mod.DATOS_LARGO, parse_dates=["ds"])
     diario_paths = {par: cfg["diario"] for par, cfg in PARES_CONFIG.items()}
+    diarios_dfs = {par: pd.read_csv(cfg["diario"], parse_dates=["ds"]) for par, cfg in PARES_CONFIG.items()}
 
     capital_multi = CAPITAL_INICIAL
     partes_multi = []
+    diagnostico_por_par = []
     for w, (clp_train, clp_test) in enumerate(wf_mod.ventanas_walkforward(dfs["USDCLP"])):
         fecha_corte = clp_test["ds"].iloc[0]
         print(f"\n--- Ventana {w + 1}/{N_WINDOWS_WF}: train CLP={len(clp_train)} semanas, test={clp_test['ds'].min().date()} a {clp_test['ds'].max().date()} ---")
@@ -127,6 +157,11 @@ if __name__ == "__main__":
         partes_multi.append(r)
         print(f"  Capital al cierre de la ventana: ${capital_multi:.2f} ({(r['posicion'] != 0).sum()} operaciones)")
 
+        filas_diag = evaluar_operaciones_por_par(modelo, dfs_train, dfs, diario_paths, diarios_dfs, fecha_corte, w + 1)
+        for fila in filas_diag:
+            print(f"    [diagnostico] {fila['estrategia']}: {fila['operaciones']} operaciones, retorno {fila['retorno_total_%']:.2f}%")
+        diagnostico_por_par.extend(filas_diag)
+
     resultado_multi = pd.concat(partes_multi, ignore_index=True)
     resultado_multi.to_csv(f"{RESULTADOS_DIR}/walkforward_multiactivo_operaciones.csv", index=False)
 
@@ -139,5 +174,12 @@ if __name__ == "__main__":
     ppo_solo_clp = pd.read_csv(f"{RESULTADOS_DIR}/walkforward_ppo_operaciones.csv", parse_dates=["ds"])
     graficar_comparacion(resultado_multi, ppo_solo_clp, f"{RESULTADOS_DIR}/walkforward_multiactivo_curva_capital.png")
 
+    tabla_diagnostico = pd.DataFrame(diagnostico_por_par)
+    tabla_diagnostico.to_csv(f"{RESULTADOS_DIR}/walkforward_multiactivo_diagnostico_por_par.csv", index=False)
+    resumen_diagnostico = tabla_diagnostico.groupby("estrategia").agg(
+        operaciones_totales=("operaciones", "sum"), ventanas=("ventana", "count")).reset_index()
+
     print(f"\n=== Walk-forward multi-activo completo: {N_WINDOWS_WF * N_TEST_POR_VENTANA} semanas de test (out-of-sample) de USD/CLP ===\n")
     print(tabla.to_string(index=False))
+    print(f"\n=== Diagnostico: la MISMA politica evaluada en su propio tramo out-of-sample de cada par ({N_WINDOWS_WF} ventanas) ===\n")
+    print(resumen_diagnostico.to_string(index=False))

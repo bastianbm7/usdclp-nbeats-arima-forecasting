@@ -433,6 +433,61 @@ Este tramo (9.11-9.14) mezcló trabajo sin supervisión directa (9.11-9.13, prio
 
 Con esto se agotan las 12 candidatas de indicadores técnicos derivados del precio semanal de USD/CLP identificadas hasta ahora (7 originales + 5 de la ronda radar-baseline + estas 12 no se solapan, aunque MACD/RSI ya estaban en las 7 originales). Ninguna superó el umbral. Dado el paso 2 condicional de la Tarea ("si alguna supera 0.11, agregarla al PPO") no aplicó, no se entrenó ningún agente nuevo — se cierra la línea sin gasto de cómputo, mismo criterio de "barato antes de caro" que las secciones anteriores. La pista con mayor evidencia real sigue siendo la de 9.13/9.14 (cobre a frecuencia diaria, fuera del alcance semanal de esta línea).
 
+### 9.18 Issue #6: ¿el atractor de "no operar nunca" es especifico de USD/CLP o generico? (multi-activo FX)
+
+La seccion 9.8 (propuesta 2) y el Issue #6 dejaban abierta una pregunta que ninguna de las 6 variantes de 9.9/9.11/9.12 podia responder por si sola: ¿"USD/CLP no tiene edge explotable a esta escala" es un hallazgo especifico de este par, o un problema generico de entrenar con ~250-330 semanas de un unico activo? Se entrena el mismo agente PPO (misma economia real de apalancamiento + TP/SL de 9.3) sobre varios pares de FX a la vez, en vez de solo CLP.
+
+**Diseno elegido**: politica UNICA (compartida) entrenada sobre episodios de distintos pares — no una red separada por activo. Implementacion por **composicion**, no reescritura: `30_entorno_trading_rl_multiactivo.py` define `MultiFXTradingEnv`, un wrapper de `gymnasium.Env` que mantiene una instancia de `USDCLPTradingEnv` (11, sin modificar — el Issue #5 hermano lo tocaba en paralelo para frecuencia diaria) por cada par, y en cada `reset()` elige cual esta "activa" para ese episodio completo; el estado que ve la red es el de esa sub-instancia **concatenado con un one-hot del par activo**. La economia de riesgo real (apalancamiento via risk sizing, trailing stop, take-profit, slippage) es exactamente la misma que ya entrena/evalua al agente solo-CLP, no una segunda implementacion que podria divergir.
+
+El one-hot es la decision de diseno deliberada frente al hallazgo de la seccion 9.14: ahi, un pooling ciego (una regresion OLS sobre 13 pares sin poder condicionar por moneda) diluyo la calibracion especifica de CLP porque la sensibilidad al cobre variaba demasiado entre monedas (0.02 a 0.37) para promediarla sin mas. Una red PPO que recibe el one-hot del par activo si puede aprender una politica condicional — comportarse distinto segun la moneda — sin dejar de compartir la mayoria de los pesos entre pares. Es el mecanismo mas barato disponible en este stack (gymnasium + stable-baselines3, sin arquitectura nueva) que se acerca al espiritu de "aprender a ponderar que monedas importan" sin llegar a una arquitectura cross-attention completa (X-Trend, fuera de alcance de este Issue).
+
+**Pares elegidos**: USD/MXN, USD/BRL, USD/COP (candidatos sugeridos en el propio Issue #6 por similitud de dinamica cambiaria LatAm con USD/CLP). Para cada uno se genero (`29_dataset_volatilidad_multipar.py`, reusando 01/09/10 via importlib) el mismo dataset semanal walk-forward que usa CLP (forecast N-HiTS de 350 ventanas + volatilidad GARCH + MACD/RSI/min-max) y se repitio la comparacion de modelos de volatilidad de la seccion 9.2 — **no se asumio que GARCH(1,1) ganara igual que en CLP**:
+
+| Par | Ganador | Mejora vs. Naive | GARCH vs. Naive |
+|---|---|---|---|
+| USD/MXN | **GARCH** | +36.5% | +36.5% (gana) |
+| USD/BRL | **GARCH** | +40.9% | +40.9% (gana) |
+| USD/COP | **MediaMovil** | +16.5% | +6.8% (pierde contra MediaMovil y EGARCH) |
+
+GARCH(1,1) repite como ganador en MXN y BRL, consistente con CLP (seccion 9.2) — pero **en COP pierde contra la media movil simple** (16.5% vs. 6.8% de mejora sobre naive), e incluso queda por debajo de EGARCH (7.7%). Se mantuvo GARCH como feature de volatilidad del agente en los 4 pares de todas formas, por consistencia arquitectonica del estado compartido (cambiar el modelo de volatilidad por par complicaria la comparabilidad del one-hot sin un beneficio claro) — pero el resultado de COP queda documentado como limitacion explicita, no oculto: si se retoma esta linea, vale la pena probar COP con su propio modelo ganador (media movil) en vez de forzar GARCH.
+
+**Walk-forward final** (mismo esquema de 5 ventanas × 20 semanas que 9.4/9.9/9.11/9.12, presupuesto de entrenamiento de 100k timesteps por ventana **igual** al agente solo-CLP — no 4× mas, ver nota de diseno en `31_backtest_walkforward_multiactivo.py`: la pregunta que responde este experimento es si diversificar el MISMO computo entre 4 pares ayuda, no si dar mas computo ayuda):
+
+| Estrategia | Retorno total | Sharpe anualizado | Max drawdown | Operaciones |
+|---|---|---|---|---|
+| Buy-and-hold | -0.9% | 0.00 | -15.4% | 100 |
+| Umbral simple (Opcion A) | -16.0% | -0.94 | -20.8% | 68 |
+| **PPO multi-activo (CLP+MXN+BRL+COP)** | **0.0%** | — | 0.0% | **0** |
+| **PPO solo-CLP (referencia, 9.4/9.9)** | **0.0%** | — | 0.0% | **0** |
+
+![Curva de capital: multi-activo vs. solo-CLP](../datos/resultados/walkforward_multiactivo_curva_capital.png)
+
+**El resultado es identico al de la seccion 9.4, hasta el centavo, en las 5 ventanas.** El agente multi-activo converge exactamente a la misma politica degenerada de "no operar nunca" que el agente solo-CLP — capital final $100.00 sin diferencia ni en el tercer decimal, mismo patron ya visto en el Issue #2 (`ent_coef` alto y `exceso_bh` tampoco movieron la aguja, seccion 9.9). Entrenar sobre 4 pares a la vez, con una politica que ademas puede condicionar su comportamiento por moneda via el one-hot, no cambio absolutamente nada.
+
+**Diagnostico adicional, mas alla de lo que pedia estrictamente el Issue**: en vez de asumir que la respuesta es "no, no ayuda" solo porque CLP sigue en $100.00, se evaluo la MISMA politica entrenada tambien sobre el tramo out-of-sample propio de MXN, BRL y COP (misma fecha de corte que CLP en cada ventana, sin look-ahead) — 20 evaluaciones independientes en total (4 pares × 5 ventanas):
+
+| Par | Operaciones totales (5 ventanas) |
+|---|---|
+| USD/CLP | 0 |
+| USD/MXN | 0 |
+| USD/BRL | 0 |
+| USD/COP | 0 |
+
+**0 operaciones en las 20/20 evaluaciones.** Esto responde directamente la pregunta que motivo el Issue #6: el atractor de "no operar nunca" **no es un artefacto especifico de USD/CLP** — la misma politica, entrenada con mas diversidad de regimenes de mercado (4 monedas en vez de 1) y con capacidad explicita de condicionar su comportamiento por moneda, tampoco encuentra una razon para operar en USD/MXN, USD/BRL ni USD/COP. Es evidencia consistente con el diagnostico acumulado de las secciones 9.5/9.9/9.11/9.12: el cuello de botella es la falta de señal explotable con estas features a frecuencia semanal, no un problema de "pocos datos de un solo activo" ni del diseno del agente — mas datos de mas monedas, sin mas señal real detras, no le dan al agente ninguna palanca nueva para encontrar una politica rentable.
+
+**¿Confirma o contradice el hallazgo de pooling de la seccion 9.14?** Ni una cosa ni la otra de forma directa — lo matiza. La seccion 9.14 encontro que un pooling **ciego** (OLS sin poder condicionar por moneda) empeoraba el resultado especifico de CLP (+67.9% pooled vs. +83.0% solo-CLP) porque promediaba coeficientes de monedas con sensibilidad al cobre muy distinta. Aca, el diseno evito deliberadamente ese mecanismo (one-hot condicionante en vez de pooling ciego) — y el resultado para CLP fue **identico**, no peor, al entrenamiento solo-CLP. Es decir: cuando se evita el mecanismo especifico que perjudico a CLP en 9.14 (el promedio ciego), sumar datos de otras monedas deja de ser perjudicial — pero tampoco es util, porque no hay señal real que extraer de ninguna de las 4 series a esta frecuencia. Las dos secciones son consistentes con la misma leccion de fondo: **"mas datos de otras monedas" no es una mejora automatica ni un perjuicio automatico — depende de si hay señal real detras, y en ninguno de los dos experimentos (9.14 a diario con cobre, 9.18 a semanal con las 7 features originales) el pooling por si solo genero una señal que no existia antes.**
+
+**Limitaciones de este experimento**: presupuesto de entrenamiento igual al agente solo-CLP (no 4×) fue una decision de diseno explicita (ver arriba), pero significa que el agente multi-activo vio en promedio ~25k pasos "de CLP" por ventana contra 100k del agente solo-CLP — no se descarta que un presupuesto 4× mayor (400k timesteps/ventana) cambie el resultado, aunque dado que ambos convergen al mismo punto fijo exacto con presupuestos muy distintos de exposicion a CLP especificamente, es poco probable. Una sola arquitectura (MLP de stable-baselines3, sin capas compartidas explicitas ni embeddings aprendidos del par-id mas alla del one-hot) y una sola semilla (42, consistente con el resto del proyecto). El muestreo de pares durante el entrenamiento es uniforme (25% cada uno) — no se probo un muestreo ponderado por volumen/liquidez ni curriculum learning.
+
+### 9.19 Tareas pendientes en el Issue #6
+
+- [x] Rediseñar el entorno para multi-activo (`30_entorno_trading_rl_multiactivo.py`, por composicion sobre `11`, sin tocarlo).
+- [x] Generar el dataset walk-forward semanal para USD/MXN, USD/BRL, USD/COP (`29_dataset_volatilidad_multipar.py`).
+- [x] Repetir la comparacion de modelos de volatilidad para cada par nuevo — GARCH gana en MXN/BRL, MediaMovil gana en COP.
+- [x] Entrenar y evaluar el agente multi-activo en walk-forward, comparado contra el agente solo-CLP — resultado identico ($100.00, 0 operaciones), y el diagnostico por par confirma que el atractor es generico, no especifico de CLP.
+- [ ] Decidir si vale la pena un experimento con presupuesto de entrenamiento 4× (400k timesteps/ventana) para descartar del todo que sea un problema de exposicion insuficiente a CLP, dado lo poco probable que cambie algo segun el patron de esta seccion.
+- [ ] Cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" con este hallazgo documentado.
+
 ## Reproducibilidad
 
-Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` a `17` para la extensión de trading con RL — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
+Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo `29`-`31` del Issue #6 — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
