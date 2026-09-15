@@ -421,6 +421,7 @@ Este tramo (9.11-9.14) mezcló trabajo sin supervisión directa (9.11-9.13, prio
 - [ ] Si se decide ir a diario: el panel de 13 pares ya construido (9.14) sirve como insumo directo para una versión "contexto compartido" real (estilo X-Trend) en vez de pooling ingenuo — encoder de tendencia entrenado sobre el panel, no una regresión OLS que promedia todo por igual.
 - [ ] Decidir si este trabajo (9.11-9.14) se formaliza como un Issue de GitHub retroactivo o se documenta solo en el paper — no se abrió Issue nuevo porque no había uno para el radar-baseline en sí, a diferencia de los Issues #1/#2.
 - [ ] Actualizar/cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" a la luz de este hallazgo (sigue pendiente, sin tocar) — el resultado de 9.14 sugiere que la versión "pooling simple" de esa Tarea probablemente no ayudaría; si se retoma, hacerlo con un mecanismo más parecido a X-Trend.
+- [x] Sesión cerrada acá (2026-09-15) a pedido de Bastián. Se creó una Tarea nueva en Notion, "Reconstruir pipeline de trading RL a frecuencia diaria (USD/CLP + cobre)" (Estado=Por hacer, Prioridad=Media, proyecto vinculado), para retomar la reconstrucción completa en un chat nuevo — con todo el contexto técnico resumido ahí mismo, apuntando a esta sección del paper.
 
 ## Reproducibilidad
 
