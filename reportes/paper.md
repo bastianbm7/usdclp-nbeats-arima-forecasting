@@ -423,6 +423,16 @@ Este tramo (9.11-9.14) mezcló trabajo sin supervisión directa (9.11-9.13, prio
 - [ ] Actualizar/cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" a la luz de este hallazgo (sigue pendiente, sin tocar) — el resultado de 9.14 sugiere que la versión "pooling simple" de esa Tarea probablemente no ayudaría; si se retoma, hacerlo con un mecanismo más parecido a X-Trend.
 - [x] Sesión cerrada acá (2026-09-15) a pedido de Bastián. Se creó una Tarea nueva en Notion, "Reconstruir pipeline de trading RL a frecuencia diaria (USD/CLP + cobre)" (Estado=Por hacer, Prioridad=Media, proyecto vinculado), para retomar la reconstrucción completa en un chat nuevo — con todo el contexto técnico resumido ahí mismo, apuntando a esta sección del paper.
 
+### 9.16 Cierre de la línea "buscar mejor señal" semanal: SMA/EMA/Bollinger/CCI/ADX tampoco superan el umbral (Issue #4)
+
+Última extensión de la propuesta 1 de 9.8 (Tarea de Notion "Probar medias móviles..."), después de que MACD, RSI, momentum (9.11) y tasas/cobre semanal (9.11) ya hubieran fallado. Se probaron 12 indicadores técnicos adicionales, ninguno usado antes en este proyecto: SMA y EMA relativas al precio a 5/10/20/50 semanas, ancho de banda y `%B` de Bollinger (20 semanas, 2 desv. estándar), y CCI/ADX (20 y 14 semanas respectivamente) — estos dos últimos señalados en la ronda 1 del radar-baseline (vía FinRL/Qlib Alpha158) como indicadores nunca probados acá. CCI y ADX necesitan High/Low, que `01_obtener_datos.py` descarta (solo guarda Close); se descargó un OHLC semanal separado (`datos/bases/usdclp_ohlc_semanal.csv`, cache propio) en vez de tocar el pipeline principal.
+
+**Resultado**: ninguna de las 12 supera |r|=0.11. La más fuerte es `ema_50_rel` con -0.076 — menos de la mitad del umbral, y más débil que 4 de las 7 features originales y que `copper_mom_4s` (-0.082) de la ronda anterior. `cci` y `bb_pctb` quedan prácticamente en cero (0.007 y -0.004). Confirma la expectativa honesta de la propia Tarea: son transformaciones del mismo precio que ya había fallado en sus otras formas (MACD, RSI, momentum), y suavizar más (SMA/EMA/Bollinger) no agrega información nueva, solo la retrasa.
+
+![Correlación SMA/EMA/Bollinger/CCI/ADX vs. todo lo probado hasta ahora](../datos/resultados/analisis_features_sma_ema_correlacion.png)
+
+Con esto se agotan las 12 candidatas de indicadores técnicos derivados del precio semanal de USD/CLP identificadas hasta ahora (7 originales + 5 de la ronda radar-baseline + estas 12 no se solapan, aunque MACD/RSI ya estaban en las 7 originales). Ninguna superó el umbral. Dado el paso 2 condicional de la Tarea ("si alguna supera 0.11, agregarla al PPO") no aplicó, no se entrenó ningún agente nuevo — se cierra la línea sin gasto de cómputo, mismo criterio de "barato antes de caro" que las secciones anteriores. La pista con mayor evidencia real sigue siendo la de 9.13/9.14 (cobre a frecuencia diaria, fuera del alcance semanal de esta línea).
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` a `17` para la extensión de trading con RL — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
