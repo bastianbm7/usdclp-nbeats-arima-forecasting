@@ -199,7 +199,11 @@ if __name__ == "__main__":
 
     resultados_concat = {nombre: pd.concat(partes, ignore_index=True) for nombre, partes in resultados_por_estrategia.items()}
     for nombre, r in resultados_concat.items():
-        r.to_csv(f"{RESULTADOS_DIR}/walkforward_diario_{nombre.split()[0].lower()}_operaciones.csv", index=False)
+        # slug con las 2 primeras palabras (no solo la primera, como 14) -
+        # "Umbral simple" y "Umbral cobre" comparten la primera palabra y se
+        # pisaban entre si con el esquema de 1 palabra de 14_backtest_walkforward_gestion_riesgo.py
+        slug = "_".join(nombre.lower().replace("(", "").replace(")", "").split()[:2])
+        r.to_csv(f"{RESULTADOS_DIR}/walkforward_diario_{slug}_operaciones.csv", index=False)
 
     tabla = pd.DataFrame([calcular_metricas(r, nombre) for nombre, r in resultados_concat.items()])
     tabla = tabla.sort_values("sharpe_anualizado", ascending=False).reset_index(drop=True)

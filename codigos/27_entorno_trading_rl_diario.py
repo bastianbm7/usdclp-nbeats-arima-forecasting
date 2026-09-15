@@ -82,16 +82,39 @@ def calcular_salida_dia(entrada, precio_manana, vol, take_profit, direccion, k_s
     # trailing real posible (hace falta >=2 puntos para que el stop "se mueva"),
     # asi que es un chequeo de TP/SL de un solo paso contra el unico precio
     # disponible (el cierre de manana).
+    #
+    # BUG encontrado y corregido (Issue #5, al revisar por que "Umbral cobre"
+    # daba -99.75% en 28_backtest_walkforward_diario.py - un numero tan malo
+    # que ameritaba desconfiar antes de reportarlo, mismo criterio que "BUG #3"
+    # de NOTAS-CLAUDE.md): take_profit=nhits_h1 es un precio ABSOLUTO, no
+    # necesariamente del lado ganador de la posicion. El agente semanal (11) y
+    # la estrategia "Umbral simple" (28, posiciones_umbral_simple) SIEMPRE
+    # eligen la direccion en base al signo de (nhits_h1 - entrada), asi que
+    # take_profit termina del lado correcto por construccion. Pero cualquier
+    # estrategia cuya direccion venga de OTRA señal (ej. "Umbral cobre", que
+    # usa copper_ret_1d - nada que ver con el forecast NHITS) puede terminar
+    # con un take_profit del lado PERDEDOR (ej. corto con take_profit arriba
+    # de la entrada) - la version anterior de este chequeo igual "tomaba
+    # ganancia" ahi, cerrando la posicion con PERDIDA pero etiquetada
+    # take_profit (confirmado en los datos: 170/300 cierres "take_profit" con
+    # pnl PROMEDIO NEGATIVO de -0.57, sumando -96.2 de los -99.75 puntos
+    # totales perdidos). La correccion: el take-profit solo es un gatillo
+    # valido si esta genuinamente del lado ganador (take_profit > entrada
+    # para largo, < entrada para corto); si no, se ignora y solo quedan
+    # stop-loss/cierre de dia como salida - el pnl de cada trade se sigue
+    # calculando con el precio de salida real, nunca se inventa nada.
     if direccion == "largo":
         stop = entrada * (1 - k_stop_loss * vol)
-        if precio_manana >= take_profit:
+        tp_valido = take_profit > entrada
+        if tp_valido and precio_manana >= take_profit:
             return take_profit, "take_profit"
         if precio_manana <= stop:
             return stop, "stop_loss"
         return precio_manana, "cierre_dia"
     else:
         stop = entrada * (1 + k_stop_loss * vol)
-        if precio_manana <= take_profit:
+        tp_valido = take_profit < entrada
+        if tp_valido and precio_manana <= take_profit:
             return take_profit, "take_profit"
         if precio_manana >= stop:
             return stop, "stop_loss"
