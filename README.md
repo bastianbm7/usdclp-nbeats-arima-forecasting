@@ -125,6 +125,8 @@ El forecasting de arriba responde si un modelo predice bien el precio. Una exten
 
 **[Issue #10](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/10) mapea directamente el patrón que sugería el desglose anterior**: barrido de take-profit FIJO por horizonte (h1 a h5) cruzado con ventana de holding (N=3, 5, 7) — 15 combinaciones, cada una con su propio agente PPO, todas sobre el mismo dataset (comparables entre sí sin el caveat de reproducibilidad de NHITS que sí afecta comparar contra 9.20/9.23). **h2 resulta sistemáticamente el peor horizonte de TP en las tres ventanas de holding** (Sharpe 0.06 en N=3, 1.83 en N=5, 1.27 en N=7 — el más bajo o casi el más bajo en cada fila) — confirma con un diseño controlado el mismo patrón que el desglose adaptativo insinuaba. N=5 es la ventana con mejor comportamiento general (Sharpe 1.67-2.38 en los cinco horizontes); el mejor resultado individual es N=7/h4 (Sharpe 2.73). 📄 **[Ver el detalle completo, con la grilla de 15 combinaciones, en la sección 9.24 del paper](reportes/paper.md#924-issue-10-barrido-de-take-profit-fijo-por-horizonte-h1-h5--ventana-de-holding-n357)**.
 
+**[Issue #11](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/11) prueba si el buen perfil de riesgo de N=7 (poco stop-loss, poco drawdown) se sostiene con ventanas aún más largas**: se extendió la grilla a N ∈ {10, 12, 14, 20} (20 combinaciones más, mismo dataset y entorno ya generalizados). **No es monótono**: en vez de seguir mejorando, aparecen dos zonas buenas separadas por un bache — N=5-7 (mejor Sharpe promedio, ~1.9-2.0) y N=14 (mejor drawdown y % de stop-loss promedio, superando incluso a N=7) — con N=10-12 empeorando en el medio (el % de stop-loss en N=10 es *peor* que en N=3/N=5) y N=20 colapsando (Sharpe promedio 0.35). Con solo 15-30 decisiones totales en estas combinaciones (contra 100 en N=3), buena parte del vaivén puede ser ruido de muestra chica — se documenta como limitación explícita, no se resuelve en esta sesión. 📄 **[Ver el detalle completo, con el gráfico resumen, en la sección 9.26 del paper](reportes/paper.md#926-issue-11-el-patrón-de-n7-menos-stop-loss-menos-drawdown-se-sostiene-con-ventanas-más-largas)**.
+
 ## Datos
 
 Tipo de cambio USD/CLP, serie diaria descargada con [`yfinance`](https://github.com/ranaroussi/yfinance) (ticker `CLP=X`, fuente: Yahoo Finance). Se guarda una copia cruda en `datos/bases/` para reproducibilidad exacta (no depender de que Yahoo siga sirviendo el mismo histórico).
@@ -164,8 +166,18 @@ codigos/
 ├── 29_dataset_volatilidad_multipar.py    # Issue #6: dataset RL semanal + comparacion de modelos de volatilidad para USD/MXN, USD/BRL, USD/COP
 ├── 30_entorno_trading_rl_multiactivo.py  # Issue #6: entorno Gym multi-activo (composicion sobre 11, one-hot del par activo) - no modifica 11
 ├── 31_backtest_walkforward_multiactivo.py  # Issue #6: walk-forward del agente multi-activo vs. solo-CLP + diagnostico por par
-├── 32_entorno_trading_rl_diario_multidia.py  # Issue #9: entorno Gym con holding fijo de N dias (trailing stop del agente semanal + fix de TP del agente diario)
-└── 33_backtest_walkforward_diario_multidia.py  # Issue #9: walk-forward del holding de N dias (N=1,2,3,5) vs. umbral cobre + coincidencia de direccion
+├── 32_entorno_trading_rl_diario_multidia.py  # Issue #9: entorno Gym con holding fijo de N dias (trailing stop del agente semanal + fix de TP del agente diario) - Issue #10 le agrega horizonte_tp configurable
+├── 33_backtest_walkforward_diario_multidia.py  # Issue #9: walk-forward del holding de N dias (N=1,2,3,5) vs. umbral cobre + coincidencia de direccion
+├── 34_features_semanales_validacion.py    # chequeo (descartado): precios de la semana calendario anterior como feature - correlacion decae a la mitad 2010-2018 vs 2018-2026
+├── 35_generar_dataset_rl_diario_h3.py     # dataset con nhits_h3 (H=8) para el experimento de TP adaptativo
+├── 36_entorno_trading_rl_diario_tp_adaptativo.py  # TP adaptativo: elige h1/h2/h3 segun consistencia del forecast, holding=3 fijo
+├── 37_backtest_walkforward_diario_tp_adaptativo.py  # walk-forward de TP adaptativo vs. TP fijo en h1 vs. umbral cobre
+├── 38_graficos_entrada_salida_multidia.py  # graficos de entrada/salida por operacion, reconstruye fecha exacta de salida sin reentrenar
+├── 39_generar_dataset_rl_diario_h5.py     # Issue #10: dataset con nhits_h1..h5 (H=10) para el barrido de TP por horizonte
+├── 40_backtest_walkforward_diario_grilla_nh.py  # Issue #10: grilla TP fijo por horizonte (h1-h5) x holding (N=3,5,7), 15 combinaciones
+├── 41_graficos_grilla_nh_h4.py            # graficos de retorno en el tiempo y entrada/salida, h4 fijo comparando N
+├── 42_backtest_walkforward_diario_grilla_nh_largo.py  # Issue #11: extiende la grilla a N=10,12,14,20 (mismo dataset/entorno del Issue #10)
+└── 43_graficos_resumen_grilla_nh_extendida.py  # Issue #11: Sharpe/drawdown/%stop-loss promedio por N, grilla completa (N=3 a 20)
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP

@@ -668,8 +668,37 @@ Barrido completo, sin adaptación: take-profit fijo en cada horizonte de forecas
 - [x] Generalizar el entorno multi-día para aceptar un horizonte de take-profit configurable (`32_entorno_trading_rl_diario_multidia.py`, parámetro `horizonte_tp`).
 - [x] Correr las 15 combinaciones N×h y reportar retorno/Sharpe/razón de cierre/días reales de holding por combinación (`40_backtest_walkforward_diario_grilla_nh.py`).
 - [x] Confirmar si el patrón "h2 es malo" del desglose de 9.23 se replica con un diseño controlado — sí, en las tres ventanas de holding probadas.
-- [ ] Cerrar la Tarea de Notion "Barrer take-profit fijo por horizonte..." con este hallazgo documentado.
+- [x] Cerrar la Tarea de Notion "Barrer take-profit fijo por horizonte..." con este hallazgo documentado.
+
+### 9.26 Issue #11: ¿el patrón de N=7 (menos stop-loss, menos drawdown) se sostiene con ventanas más largas?
+
+Bastián observó en 9.24 que N=7 tenía el mejor perfil de riesgo de la grilla original (menos operaciones cerradas por stop-loss, drawdown más chico) — exactamente el comportamiento buscado: que la posición se mueva a favor y, si se da vuelta, se cierre por trailing-stop o take-profit en vez de un stop-loss duro. Pidió extender el barrido a N ∈ {10, 12, 14, 20} para ver si esa mejora se sostiene al alargar aún más la ventana. Mismo dataset (ya llegaba a h5, no hizo falta regenerar NHITS) y mismo entorno (`32_entorno_trading_rl_diario_multidia.py`, ya generalizado) — solo cambió el rango de N. Implementado en `42_backtest_walkforward_diario_grilla_nh_largo.py`, 20 combinaciones nuevas.
+
+**Resumen, promediando sobre h1-h5 para cada N** (grilla completa: 3, 5, 7 de 9.24 + 10, 12, 14, 20 de esta sección):
+
+| N | Sharpe promedio | Drawdown promedio | % stop-loss promedio | Decisiones totales |
+|---|---|---|---|---|
+| 3 | 0.65 | -22.8% | 21.0% | 100 |
+| 5 | **2.04** | -14.2% | 21.3% | 60 |
+| 7 | 1.92 | -8.6% | 16.5% | 40 |
+| 10 | 1.33 | -10.9% | **23.3%** | 30 |
+| 12 | 0.70 | -10.0% | 17.6% | 25 |
+| 14 | 1.62 | **-5.3%** | **16.0%** | 20 |
+| 20 | 0.35 | -7.9% | 20.0% | 15 |
+
+![Sharpe, drawdown y % stop-loss promedio por N](../datos/resultados/grilla_nh_resumen_por_N.png)
+
+**Respuesta a la pregunta: no, el patrón NO es monótono.** En vez de seguir mejorando con N, aparecen dos zonas separadas por un bache: N=5-7 (mejor Sharpe, 1.9-2.0) y N=14 (mejor drawdown y mejor % de stop-loss, incluso superando a N=7) — con N=10 y N=12 empeorando en el medio (el % de stop-loss en N=10, 23.3%, es *peor* que en N=3 y N=5) y N=20 colapsando (Sharpe promedio 0.35, uno de los cinco resultados individuales da levemente negativo). La hipótesis implícita de "alargar más sigue ayudando" queda rechazada por la evidencia, igual que la Propuesta A original del Issue #9.
+
+**Limitación central, no un detalle menor**: el número de decisiones cae fuerte con N (100 en N=3 → 15 en N=20, con `N_TEST_POR_VENTANA=60` fijo) — gran parte del vaivén entre N=10/12/14/20 puede ser ruido de muestra chica en vez de una señal real sobre la ventana de holding "correcta". Con 15-30 decisiones totales no se puede distinguir con confianza "N=14 es genuinamente mejor" de "N=14 tuvo una racha favorable en este tramo de test" — haría falta otro periodo de test o más ventanas de walk-forward para separar ambas explicaciones, lo que queda fuera del alcance de esta sesión.
+
+### 9.27 Tareas pendientes en el Issue #11
+
+- [x] Correr la grilla extendida (N=10,12,14,20 × h1-h5, 20 combinaciones) reusando el dataset y el entorno ya generalizados del Issue #10.
+- [x] Responder si el patrón de bajo stop-loss/drawdown de N=7 se sostiene al alargar más — no de forma monótona; aparece una segunda zona buena en N=14 mismo con un bache en N=10-12 y un colapso en N=20.
+- [ ] Decidir si vale la pena correr otro periodo de test (no solo el tramo final del dataset) para separar señal real de ruido de muestra chica en N=10 a N=20, antes de usar este patrón para una decisión de diseño.
+- [x] Cerrar la Tarea de Notion "Extender la grilla N x h del Issue #10..." con este hallazgo documentado.
 
 ## Reproducibilidad
 
-Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), y el barrido de take-profit por horizonte del Issue #10 (`39`-`40`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
+Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), y la extensión a ventanas de holding más largas del Issue #11 (`41`-`43`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.

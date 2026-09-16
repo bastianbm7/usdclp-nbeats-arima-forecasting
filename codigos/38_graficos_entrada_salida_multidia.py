@@ -23,20 +23,23 @@ COLORES_RAZON = {"take_profit": "green", "stop_loss": "red", "trailing_stop": "p
 ETIQUETAS_RAZON = {"take_profit": "Salida: take-profit", "stop_loss": "Salida: stop-loss", "trailing_stop": "Salida: trailing stop", "cierre_periodo": "Salida: fin de ventana"}
 
 
-def reconstruir_operaciones(df_completo, csv_posiciones, dias_holding=None, adaptativo=False):
+def reconstruir_operaciones(df_completo, csv_posiciones, dias_holding=None, adaptativo=False, horizonte_tp=1):
     # Reconstruye, ventana por ventana (mismos limites que el walk-forward
     # original), el dataframe de decisiones YA instrumentado con
     # fecha_salida_* - y le pega encima la posicion/razon/pnl que el agente
     # ya jugo (guardados en el CSV del backtest original), emparejando por
     # fecha de decision. No hace falta reentrenar PPO: la posicion elegida ya
     # esta grabada, solo falta la fecha exacta de salida.
+    #
+    # horizonte_tp (Issue #10): que columna nhits_h{N} uso el take-profit -
+    # default=1 preserva el comportamiento original de este archivo.
     posiciones = pd.read_csv(csv_posiciones, parse_dates=["ds"])
     partes = []
     for df_train, df_test in wf_mod.ventanas_walkforward(df_completo, N_WINDOWS_WF, N_TEST_POR_VENTANA):
         if adaptativo:
             env = adaptativo_mod.USDCLPTradingEnvDiarioTPAdaptativo(df=df_test)
         else:
-            env = multidia_mod.USDCLPTradingEnvDiarioMultidia(df=df_test, dias_holding=dias_holding)
+            env = multidia_mod.USDCLPTradingEnvDiarioMultidia(df=df_test, dias_holding=dias_holding, horizonte_tp=horizonte_tp)
         decisiones = env.df.copy()
         decisiones = decisiones.merge(posiciones[["ds", "posicion", "razon_cierre", "pnl"]], on="ds", how="inner")
         partes.append(decisiones)
