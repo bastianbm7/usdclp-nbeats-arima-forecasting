@@ -536,6 +536,60 @@ GARCH(1,1) repite como ganador en MXN y BRL, consistente con CLP (seccion 9.2) �
 - [ ] Decidir si vale la pena un experimento con presupuesto de entrenamiento 4× (400k timesteps/ventana) para descartar del todo que sea un problema de exposicion insuficiente a CLP, dado lo poco probable que cambie algo segun el patron de esta seccion.
 - [ ] Cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" con este hallazgo documentado.
 
+### 9.20 Issue #9: ¿operar varios días reduce la divergencia del agente con la señal del cobre? (holding fijo de N días)
+
+El Issue [#9](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/9) — motivado por una pregunta de Bastián sobre por qué el agente diario (9.17) entra y sale de cada posición en 24 horas — partió de una limitación de diseño explícita de `27_entorno_trading_rl_diario.py`: cada posición se abre al cierre de hoy y se resuelve contra el único precio disponible (el cierre de mañana), así que el trailing stop real (el mismo mecanismo que sí usa el agente semanal, 9.3) nunca tiene un segundo punto de precio para moverse a favor. La pregunta central: si se deja que una posición dure N días en vez de 1, ¿el agente se acerca más a la señal simple del cobre que ya lo supera (72.3% de coincidencia de dirección, 9.17), o se aleja?
+
+**Enfoque elegido (Propuesta A de las 3 discutidas en el Issue, la más barata)**: horizonte de holding **fijo** de N días — el dataset diario se recorre en bloques no solapados de N filas (decisión en el día 0, posición resuelta contra los días 1..N, siguiente decisión en el día N+1), reutilizando el mecanismo de trailing stop del agente semanal (`ejecutar_operacion()` de `11_entorno_trading_rl.py`) sobre esos N precios en vez de sobre los ~5 días hábiles de una semana calendario. El punto de decisión sigue siendo diario en el sentido de que el estado (incluyendo `copper_ret_1d` fresco) se lee el mismo día de la entrada — lo que cambia es cuántos días pasan hasta la siguiente decisión.
+
+**Bug encontrado antes de entrenar nada, mismo patrón que 9.17**: la primera versión de `32_entorno_trading_rl_diario_multidia.py` reusaba `ejecutar_operacion()` de `11_entorno_trading_rl.py` tal cual. El smoke-test (que compara `dias_holding=1` contra el entorno diario original, fila por fila, antes de gastar cómputo de entrenamiento) encontró una diferencia de hasta 91.7 puntos de precio de salida — la causa: esa función del agente semanal **no tiene** la corrección de take-profit inválido que 9.17 ya había encontrado y corregido para el caso diario (un `take_profit=nhits_h1` puede caer del lado perdedor de una posición cuya dirección no vino del propio forecast de NHITS). El agente semanal nunca necesitó esa corrección porque siempre elige dirección según el signo de `nhits_h1 - entrada`; acá, igual que en 27, el TP/SL se precomputa para largo y corto sin condicionar en el forecast, así que el mismo bug podía reaparecer. Se escribió `ejecutar_operacion_multidia()`, que combina el trailing stop real (de 11) con la corrección de TP inválido (de 27) — verificado que con `dias_holding=1` reproduce el resultado de 9.17 al centavo (mismo capital final, mismo Sharpe, confirmado explícitamente en el smoke-test antes de correr nada más).
+
+**Walk-forward** (`33_backtest_walkforward_diario_multidia.py`, mismo esquema de 5 ventanas × 60 días de calendario que 9.17, PPO reentrenado en cada ventana con el mismo presupuesto de 100k timesteps, para `dias_holding` ∈ {1, 2, 3, 5} — N=1 se reentrenó con el código nuevo, no se reusó el resultado de 9.17, y reprodujo esos números exactos como verificación adicional de consistencia):
+
+| Holding | Estrategia | Decisiones | Retorno total | Sharpe anualizado | Max drawdown | Operaciones |
+|---|---|---|---|---|---|---|
+| 1 día | **Umbral cobre** | 300 | +532.3% | **4.39** | -13.5% | 290 |
+| 1 día | **PPO** | 300 | +397.1% | 3.88 | -8.8% | 299 |
+| 2 días | Umbral cobre | 150 | +225.1% | 3.31 | -19.7% | 146 |
+| 2 días | PPO | 150 | +175.2% | 2.87 | -10.9% | 150 |
+| 3 días | Umbral cobre | 100 | +63.8% | 1.59 | -16.6% | 96 |
+| 3 días | PPO | 100 | +38.2% | 1.13 | -13.2% | 100 |
+| 5 días | Umbral cobre | 60 | +113.7% | 2.59 | -8.3% | 60 |
+| 5 días | PPO | 60 | +49.0% | 1.31 | -18.6% | 60 |
+| — | Buy-and-hold (referencia) | 300 | -1.2% | -0.02 | -13.2% | 300 |
+
+*Nota de anualización*: con `dias_holding>1` cada observación de retorno cubre N días de calendario, no 1 — el Sharpe se anualiza con `sqrt(252/dias_holding)` en vez del `sqrt(252)` fijo de 9.17 (que asumía observaciones diarias), para que los cuatro valores de N sean comparables entre sí. Verificado que con `dias_holding=1` esto colapsa exactamente al mismo cálculo de 9.17.
+
+![Curva de capital: holding de N días vs. buy-and-hold](../datos/resultados/walkforward_diario_multidia_curva_capital.png)
+
+**Coincidencia de dirección PPO vs. Umbral cobre, por N** (misma definición que el 72.3% de 9.17: % de días donde el PPO operó y coincidió en signo con la señal del cobre ese mismo día de entrada, promedio ponderado por días operados en las 5 ventanas):
+
+| Holding | Coincidencia de dirección |
+|---|---|
+| 1 día | 72.6% |
+| 2 días | 72.7% |
+| 3 días | 68.0% |
+| 5 días | 61.7% |
+
+**Respuesta a la pregunta del Issue: alargar el holding NO reduce la divergencia con el cobre — la aumenta.** La coincidencia de dirección baja de forma consistente de 72.6% (N=1) a 61.7% (N=5): el ~27-28% de días donde el PPO ya divergía de la señal simple en 9.17 se convierte en ~38% al forzar posiciones de 5 días. La razón entre el Sharpe del PPO y el de Umbral cobre a cada N cuenta la misma historia con más claridad, porque no depende de cuántas decisiones caben en la ventana (N=1: 3.88/4.39=0.88; N=2: 2.87/3.31=0.87; N=3: 1.13/1.59=0.71; N=5: 1.31/2.59=0.51) — el PPO se aleja relativamente del baseline simple a medida que crece N, en vez de acercarse. Extender el holding no le da al agente más margen para "convencerse" de la señal del cobre; le da más margen para que las otras variables del estado (NHITS, MACD, RSI, volatilidad) lo saquen de esa dirección durante más días seguidos.
+
+**La hipótesis de la Propuesta A queda rechazada por la evidencia, no confirmada** — es el mismo tipo de resultado honesto que ya dejó 9.4/9.9/9.12/9.18: no todas las extensiones razonables mejoran el resultado, y reportarlo así es más útil que forzar una lectura optimista.
+
+**Limitaciones, dichas sin atenuar**:
+- **Tamaño de muestra decreciente con N**: 300 decisiones en N=1 baja a solo 60 en N=5 (12 por ventana) — los Sharpe de N=3 y N=5 individualmente son ruidosos (el propio Sharpe de Umbral cobre sube de 1.59 en N=3 a 2.59 en N=5, no un patrón monótono en el nivel absoluto). El patrón que sí es robusto al ruido de muestra chica es el de la **razón** PPO/cobre, que cae de forma monótona en los 4 valores de N — es la comparación relativa, no los niveles absolutos de Sharpe a N grande, la que sostiene la conclusión de esta sección.
+- **Solo 4 valores de N probados** (1, 2, 3, 5) — no se barrió N=4 ni N>5; dado que el patrón ya es monótono y consistente en los 4 puntos disponibles, no se priorizó ampliar la grilla.
+- **Un solo periodo de test** (2025-06 a 2026-09, igual que 9.17) y una sola semilla (42) — mismas limitaciones ya declaradas en 9.17, no resueltas acá.
+- **No se probaron las Propuestas B (el agente decide todos los días si mantener/cerrar, acción "hold") ni C (acción continua con duración implícita)** discutidas en el Issue — la evidencia de la Propuesta A (más barata) no muestra ninguna mejora que justifique el costo mayor de rediseñar el entorno para B o C; queda como decisión pendiente si en el futuro se quiere probar un mecanismo de duración *adaptativa* en vez de fija, que es una pregunta distinta a la que responde esta sección.
+
+### 9.21 Tareas pendientes en el Issue #9
+
+- [x] Implementar el entorno de holding fijo de N días, reusando el trailing stop del agente semanal con la corrección de take-profit del agente diario (`32_entorno_trading_rl_diario_multidia.py`).
+- [x] Verificar por smoke-test que `dias_holding=1` reproduce exactamente el resultado de 9.17 antes de gastar cómputo de entrenamiento.
+- [x] Correr el walk-forward para N ∈ {1, 2, 3, 5} y medir retorno/Sharpe/coincidencia de dirección con el cobre en cada uno (`33_backtest_walkforward_diario_multidia.py`).
+- [x] Responder la pregunta del Issue: alargar el holding aumenta la divergencia con el cobre, no la reduce — la Propuesta A no mejora sobre el agente de 1 día.
+- [ ] Decidir si vale la pena probar la Propuesta B (acción "hold" explícita, duración adaptativa) pese a que la Propuesta A no dio señal de mejora — es una pregunta distinta (duración adaptativa vs. fija), no descartada por este resultado, pero sí sin evidencia que la respalde todavía.
+- [ ] Cerrar la Tarea de Notion "Explorar posiciones de mas de un dia en el agente RL diario" con este hallazgo documentado.
+
 ## Reproducibilidad
 
-Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`) y el agente multi-activo del Issue #6 (`29`-`31`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
+Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`) y el holding de N días del Issue #9 (`32`-`33`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
