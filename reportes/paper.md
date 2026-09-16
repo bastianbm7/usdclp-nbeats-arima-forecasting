@@ -590,6 +590,86 @@ El Issue [#9](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issu
 - [ ] Decidir si vale la pena probar la Propuesta B (acción "hold" explícita, duración adaptativa) pese a que la Propuesta A no dio señal de mejora — es una pregunta distinta (duración adaptativa vs. fija), no descartada por este resultado, pero sí sin evidencia que la respalde todavía.
 - [ ] Cerrar la Tarea de Notion "Explorar posiciones de mas de un dia en el agente RL diario" con este hallazgo documentado.
 
+### 9.22 Chequeo rápido: precios de la semana calendario anterior como feature (descartado)
+
+Idea de Bastián, fuera de Issue: ¿el cierre/apertura/mínimo/máximo de la semana calendario anterior le dan al agente diario información de "tendencia semanal" que las features actuales (basadas en ventanas de días, no semanas) no capturan? Se validó con el mismo método de correlación de 19/21/24, sin tocar el agente (`34_features_semanales_validacion.py`).
+
+En la muestra completa (2010-2026), dos de las seis features propuestas superan el umbral |r|=0.11 (`sem_ant_cierre_rel`=0.141, `sem_ant_min_rel`=0.121) — el primer caso en todo el proyecto donde una feature derivada *puramente* del propio precio de USD/CLP lo logra. Pero un chequeo de estabilidad por mitades de la muestra (mismo criterio que "verificar antes de reportar") lo desinfla: `sem_ant_cierre_rel` pasa de r=0.204 (2010-2018) a r=0.088 (2018-2026) — el efecto se debilita a menos de la mitad, y en el tramo más reciente (el que más importa para operar hoy) ya no supera el umbral. En contraste, `copper_ret_1d` es estable entre mitades (-0.259 vs. -0.254). Las dos features candidatas están además correlacionadas entre sí en 0.75 — no son señales independientes. **Conclusión: parece un efecto de régimen que se está apagando, no una señal explotable como la del cobre — no se agregó al estado del agente.**
+
+### 9.23 Take-profit adaptativo: ¿elegir entre h1/h2/h3 según consistencia del forecast mejora sobre h1 fijo?
+
+El Issue #9 (9.20) dejó fija la mecánica de salida en `take_profit = nhits_h1` para cualquier duración de holding. Idea de Bastián: en vez de un objetivo fijo, dejar que la propia trayectoria del forecast de NHITS (h1→h2→h3) decida qué tan lejos apuntar — si el movimiento se sostiene en la misma dirección y la distancia a la entrada crece paso a paso, usar el horizonte más lejano consistente; si se estanca, quedarse en h1 (mismo comportamiento de siempre). Implementado en `36_entorno_trading_rl_diario_tp_adaptativo.py`, reusando por composición `construir_decisiones_multidia()` y `ejecutar_operacion_multidia()` de 32 — holding fijo en 3 días (el horizonte más lejano que la regla puede elegir).
+
+**Nota metodológica importante, encontrada en el camino**: NHITS no tiene semilla fija en este pipeline. Para tener `nhits_h3` hubo que regenerar el dataset diario (`35_generar_dataset_rl_diario_h3.py`, H=8) — y comparar "Umbral cobre" con holding=3 de esa corrida contra el mismo experimento de 9.20 dio Sharpe 3.73 vs. 1.59 (más del doble), pese a que esa estrategia ni siquiera usa el forecast de NHITS para elegir dirección. La causa: el take-profit sí depende de `nhits_h1`, y valores de forecast distintos entre corridas mueven el resultado de cualquier estrategia que pase por ese mecanismo. Desde acá en adelante, las comparaciones dentro de un mismo dataset regenerado son válidas entre sí, pero **no** contra resultados de una corrida distinta de NHITS.
+
+**Resultado** (walk-forward de 5 ventanas × 60 días, holding=3, mismo dataset para las tres estrategias):
+
+| Estrategia | Retorno total | Sharpe | Max drawdown | Win rate |
+|---|---|---|---|---|
+| Umbral cobre (referencia) | +266.1% | 3.73 | -6.1% | 66.3% |
+| PPO baseline (TP=h1 siempre) | +90.1% | 2.13 | -12.6% | 58.0% |
+| PPO TP adaptativo (h1/h2/h3) | +88.7% | 2.04 | **-20.0%** | 54.5% |
+
+El TP adaptativo no mejora sobre el TP fijo — retorno y Sharpe levemente más bajos, drawdown casi el doble. La distribución de horizontes elegidos (44% h1, 27% h2, 29% h3) muestra que la regla sí varía de verdad, no colapsó a una sola opción.
+
+**Pero el desglose por horizonte elegido es lo interesante** (PnL total suma $88.72 ≈ el +88.7% de retorno, confirmando que las tres partes explican el agregado):
+
+| Horizonte elegido | n | PnL promedio | PnL total | % stop-loss |
+|---|---|---|---|---|
+| h1 (se estancó) | 43 | +$0.55 | +$23.66 | 18.6% |
+| h2 (consistente hasta h2) | 27 | **-$1.33** | **-$35.84** | **33.3%** |
+| h3 (consistente hasta h3) | 29 | **+$3.48** | **+$100.90** | 10.3% |
+
+Cuando el forecast se sostiene hasta h3, esas operaciones concentran casi toda la ganancia del sistema. El grupo intermedio (consistente solo hasta h2) es el que pierde plata — con el doble de stop-loss que los otros dos grupos — y arrastra hacia abajo lo que de otra forma sería una señal razonable. El resultado agregado plano esconde dos efectos de signo contrario que se cancelan, no una ausencia de señal.
+
+Días reales de holding (no solo la razón de cierre, sino cuántos días duró cada posición — instrumentado agregando el índice del día de salida a `ejecutar_operacion_multidia()`, sin reentrenar nada): take-profit y stop-loss promedian 1.4-1.8 días en ambas variantes, no 1.0 — la mayoría de esas salidas no fueron el día 1 (que hubiera sido idéntico al agente de 9.17), sino el día 2 o más tarde. El mecanismo de holding multi-día funciona de verdad en la mayoría de las operaciones, no solo en las que llegan al final de la ventana.
+
+Esta lectura ("h3 concentra la ganancia, h2 es sistemáticamente el peor") motivó el Issue #10 (9.24): en vez de inferirlo indirectamente del mecanismo adaptativo, mapearlo directamente con un barrido de TP fijo por horizonte.
+
+### 9.24 Issue #10: barrido de take-profit fijo por horizonte (h1-h5) × ventana de holding (N=3,5,7)
+
+Barrido completo, sin adaptación: take-profit fijo en cada horizonte de forecast (h1 a h5) cruzado con cada ventana de holding (N=3, 5, 7 días) — 15 combinaciones, cada una con su propio agente PPO entrenado en el mismo esquema de walk-forward de siempre (5 ventanas × 60 días, 100k timesteps). Requirió extender el dataset una vez más (`39_generar_dataset_rl_diario_h5.py`, H=10) para tener `nhits_h4`/`nhits_h5`, y generalizar el entorno multi-día (`32_entorno_trading_rl_diario_multidia.py`, parámetro `horizonte_tp`, default=1 preserva el comportamiento original). Las 15 combinaciones comparten el mismo dataset — a diferencia de 9.20 vs. 9.23, acá sí son comparables entre sí sin el caveat de reproducibilidad de NHITS.
+
+| N | h | Retorno total | Sharpe | Días reales | Cierre en ventana | Trailing stop | Take-profit | Stop-loss |
+|---|---|---|---|---|---|---|---|---|
+| 3 | h1 | +14.7% | 0.57 | 2.35 | 42.0% | 18.0% | 17.0% | 23.0% |
+| 3 | h2 | -1.7% | 0.06 | 2.30 | 41.0% | 20.0% | 18.0% | 21.0% |
+| 3 | h3 | +11.3% | 0.48 | 2.35 | 42.0% | 19.0% | 19.0% | 20.0% |
+| 3 | h4 | +28.0% | 0.90 | 2.43 | 41.0% | 21.0% | 16.0% | 22.0% |
+| 3 | h5 | +42.7% | 1.22 | 2.38 | 46.0% | 18.0% | 17.0% | 19.0% |
+| 5 | h1 | +77.1% | 2.13 | 3.32 | 38.3% | 26.7% | 13.3% | 21.7% |
+| 5 | h2 | +62.9% | 1.83 | 3.07 | 31.7% | 25.0% | 20.0% | 23.3% |
+| 5 | h3 | **+89.3%** | **2.38** | 3.28 | 33.3% | 28.3% | 20.0% | 18.3% |
+| 5 | h4 | +78.6% | 2.21 | 3.17 | 30.0% | 30.0% | 20.0% | 20.0% |
+| 5 | h5 | +54.4% | 1.67 | 3.23 | 33.3% | 26.7% | 16.7% | 23.3% |
+| 7 | h1 | +50.0% | 1.96 | 3.83 | 12.5% | 55.0% | 17.5% | 15.0% |
+| 7 | h2 | +29.1% | 1.27 | 3.65 | 15.0% | 45.0% | 20.0% | 20.0% |
+| 7 | h3 | +47.1% | 2.17 | 3.48 | 10.0% | 40.0% | 35.0% | 15.0% |
+| 7 | h4 | +74.8% | **2.73** | 3.85 | 12.5% | 52.5% | 22.5% | 12.5% |
+| 7 | h5 | +37.6% | 1.50 | 3.65 | 10.0% | 50.0% | 20.0% | 20.0% |
+
+*(Sin gráfico de curva de capital para esta grilla — 15 curvas individuales no aportan más que la tabla; los CSV completos de cada combinación están en `datos/resultados/grilla_nh_N{N}_h{h}_operaciones.csv`.)*
+
+**h2 es sistemáticamente el peor o casi peor horizonte en las tres ventanas de holding** (Sharpe 0.06 en N=3, el mínimo de todo el grupo; 1.83 en N=5, el segundo más bajo; 1.27 en N=7, el más bajo) — confirma, con un diseño controlado e independiente, el mismo patrón que ya había aparecido indirectamente en el desglose de 9.23 (el subgrupo "consistente solo hasta h2" perdía plata). No es un artefacto del mecanismo adaptativo — apuntar a h2 como objetivo fijo es, por sí solo, la peor elección en los tres holdings probados.
+
+**N=5 es la ventana con mejor comportamiento general** — los cinco Sharpe de esa fila (1.67 a 2.38) son todos razonables, sin ningún valor tan bajo como los de N=3 (0.06-1.22). El mejor resultado individual de toda la grilla es N=7/h4 (Sharpe 2.73), y el retorno más alto es N=5/h3 (+89.3%) — pero ambos son puntos aislados dentro de series con bastante variación entre h vecinos (ej. N=7 va de 1.27 a 2.73 según el h elegido), así que no se puede tratar ningún combo individual como "el óptimo" sin más validación.
+
+**Patrón de razón de cierre, igual que en 9.20/9.23**: a mayor N, más operaciones se resuelven por trailing stop (18-21% en N=3, 25-30% en N=5, 40-55% en N=7) y menos por llegar al final de la ventana sin activar nada (41-46% → 30-38% → 10-15%) — el mecanismo de holding largo se activa cada vez más, independiente del horizonte de TP elegido.
+
+**Limitaciones, dichas sin atenuar**:
+- **Tamaño de muestra decreciente con N** (100 decisiones en N=3, 60 en N=5, 40 en N=7) — los resultados de N=7 en particular son los más ruidosos de la grilla.
+- **Un solo seed (42) y una sola corrida de NHITS** — no se promedia sobre múltiples semillas ni se valida el patrón de "h2 es malo" en un periodo de test distinto.
+- **No se probaron combinaciones con h > N cuyo objetivo cae fuera de la ventana de holding** de forma explícita en el análisis (ej. h5 con N=3) — se corrieron igual (están en la tabla) pero no se interpretaron por separado; el patrón de h2-malo/N=5-bueno ya es consistente sin necesitar ese recorte.
+- **Esto no es una recomendación de despliegue** — es evidencia de que el horizonte de TP importa y de que hay una interacción real con N, no una prueba de que N=7/h4 vaya a repetirse fuera de esta muestra.
+
+### 9.25 Tareas pendientes en el Issue #10
+
+- [x] Regenerar el dataset diario con horizonte NHITS extendido a h5 (`39_generar_dataset_rl_diario_h5.py`).
+- [x] Generalizar el entorno multi-día para aceptar un horizonte de take-profit configurable (`32_entorno_trading_rl_diario_multidia.py`, parámetro `horizonte_tp`).
+- [x] Correr las 15 combinaciones N×h y reportar retorno/Sharpe/razón de cierre/días reales de holding por combinación (`40_backtest_walkforward_diario_grilla_nh.py`).
+- [x] Confirmar si el patrón "h2 es malo" del desglose de 9.23 se replica con un diseño controlado — sí, en las tres ventanas de holding probadas.
+- [ ] Cerrar la Tarea de Notion "Barrer take-profit fijo por horizonte..." con este hallazgo documentado.
+
 ## Reproducibilidad
 
-Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`) y el holding de N días del Issue #9 (`32`-`33`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
+Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), y el barrido de take-profit por horizonte del Issue #10 (`39`-`40`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.

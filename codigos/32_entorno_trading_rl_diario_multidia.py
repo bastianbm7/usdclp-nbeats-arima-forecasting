@@ -70,13 +70,23 @@ def construir_decisiones_multidia(df, dias_holding):
     # fila operable respecto al entorno original (27) - el smoke-test de
     # abajo lo verifica explicitamente, no se asume.
     precios_futuros = df["y"].tolist() + [df["y_next"].iloc[-1]]
+    # Fechas paralelas a precios_futuros, para poder reportar la fecha REAL de
+    # salida de cada operacion (no solo el precio) - usadas por los graficos
+    # de entrada/salida. La fecha del punto extra al final (analogo al precio
+    # de y_next) se aproxima a "un dia habil despues de la ultima fila" - no
+    # hay una columna de fecha real para ese punto en el dataset, y solo
+    # afecta al ultimo bloque de la serie (caso de borde, no el grueso de los
+    # datos).
+    fechas_futuras = df["ds"].tolist() + [df["ds"].iloc[-1] + pd.Timedelta(days=1)]
 
-    filas_idx, precios_periodo = [], []
+    filas_idx, precios_periodo, fechas_periodo = [], [], []
     for i in range(0, len(df) - dias_holding + 1, dias_holding):
         filas_idx.append(i)
         precios_periodo.append(precios_futuros[i + 1: i + 1 + dias_holding])
+        fechas_periodo.append(fechas_futuras[i + 1: i + 1 + dias_holding])
     decisiones = df.iloc[filas_idx].reset_index(drop=True)
     decisiones["_precios_periodo"] = precios_periodo
+    decisiones["_fechas_periodo"] = fechas_periodo
     return decisiones
 
 
@@ -102,51 +112,64 @@ def ejecutar_operacion_multidia(entrada, take_profit, stop_loss_inicial, k_stop_
     # calcular_salida_dia() de 27 (mismo precio de salida; el trailing
     # jamas se activa con un solo punto, no hay margen para que el stop se
     # mueva dentro del propio dia de resolucion).
+    #
+    # dia_salida (1-indexado, 1..len(precios_periodo)): en que dia DENTRO del
+    # bloque se resolvio la operacion - antes se descartaba (solo se sabia
+    # COMO cerro, no CUANDO); se agrega para poder reportar duracion real de
+    # holding y la fecha exacta de salida en los graficos de entrada/salida.
     stop_actual = stop_loss_inicial
     extremo_favorable = None
     if direccion == "largo":
         tp_valido = take_profit > entrada
-        for precio_dia in precios_periodo:
+        for dia_idx, precio_dia in enumerate(precios_periodo, start=1):
             extremo_favorable = precio_dia if extremo_favorable is None else max(extremo_favorable, precio_dia)
             stop_actual = max(stop_actual, extremo_favorable * (1 - k_stop_loss * vol))
             if tp_valido and precio_dia >= take_profit:
-                return take_profit, "take_profit"
+                return take_profit, "take_profit", dia_idx
             if precio_dia <= stop_actual:
                 razon = "trailing_stop" if stop_actual > stop_loss_inicial else "stop_loss"
-                return stop_actual, razon
+                return stop_actual, razon, dia_idx
     else:
         tp_valido = take_profit < entrada
-        for precio_dia in precios_periodo:
+        for dia_idx, precio_dia in enumerate(precios_periodo, start=1):
             extremo_favorable = precio_dia if extremo_favorable is None else min(extremo_favorable, precio_dia)
             stop_actual = min(stop_actual, extremo_favorable * (1 + k_stop_loss * vol))
             if tp_valido and precio_dia <= take_profit:
-                return take_profit, "take_profit"
+                return take_profit, "take_profit", dia_idx
             if precio_dia >= stop_actual:
                 razon = "trailing_stop" if stop_actual < stop_loss_inicial else "stop_loss"
-                return stop_actual, razon
-    return precio_cierre_periodo, "cierre_periodo"
+                return stop_actual, razon, dia_idx
+    return precio_cierre_periodo, "cierre_periodo", len(precios_periodo)
 
 
-def precomputar_salidas_tp_sl_multidia(decisiones, k_stop_loss=K_STOP_LOSS):
+def precomputar_salidas_tp_sl_multidia(decisiones, k_stop_loss=K_STOP_LOSS, horizonte_tp=1):
+    # horizonte_tp (Issue #10): que columna nhits_h{N} usar como objetivo de
+    # take-profit - antes hardcodeado a nhits_h1 (h1 siempre). Requiere que
+    # el df tenga esa columna (nhits_h1/h2 vienen en el dataset original de
+    # 26; h3 en el de 35; h4/h5 en el de 39_generar_dataset_rl_diario_h5.py).
+    columna_tp = f"nhits_h{horizonte_tp}"
     filas = {"largo": [], "corto": []}
     for _, fila in decisiones.iterrows():
-        entrada, vol, take_profit = fila["y"], fila["vol_garch"], fila["nhits_h1"]
+        entrada, vol, take_profit = fila["y"], fila["vol_garch"], fila[columna_tp]
         precios_periodo = fila["_precios_periodo"]
+        fechas_periodo = fila["_fechas_periodo"]
         precio_cierre_periodo = precios_periodo[-1]
 
         sl_largo = entrada * (1 - k_stop_loss * vol)
-        precio_largo, razon_largo = ejecutar_operacion_multidia(
+        precio_largo, razon_largo, dia_largo = ejecutar_operacion_multidia(
             entrada, take_profit, sl_largo, k_stop_loss, vol, "largo", precios_periodo, precio_cierre_periodo)
-        filas["largo"].append({"stop_loss": sl_largo, "precio_salida": precio_largo, "razon_cierre": razon_largo})
+        filas["largo"].append({"stop_loss": sl_largo, "precio_salida": precio_largo, "razon_cierre": razon_largo,
+                                "dias_hasta_salida": dia_largo, "fecha_salida": fechas_periodo[dia_largo - 1]})
 
         sl_corto = entrada * (1 + k_stop_loss * vol)
-        precio_corto, razon_corto = ejecutar_operacion_multidia(
+        precio_corto, razon_corto, dia_corto = ejecutar_operacion_multidia(
             entrada, take_profit, sl_corto, k_stop_loss, vol, "corto", precios_periodo, precio_cierre_periodo)
-        filas["corto"].append({"stop_loss": sl_corto, "precio_salida": precio_corto, "razon_cierre": razon_corto})
+        filas["corto"].append({"stop_loss": sl_corto, "precio_salida": precio_corto, "razon_cierre": razon_corto,
+                                "dias_hasta_salida": dia_corto, "fecha_salida": fechas_periodo[dia_corto - 1]})
 
-    decisiones = decisiones.drop(columns=["_precios_periodo"]).copy()
+    decisiones = decisiones.drop(columns=["_precios_periodo", "_fechas_periodo"]).copy()
     for direccion in ["largo", "corto"]:
-        for campo in ["stop_loss", "precio_salida", "razon_cierre"]:
+        for campo in ["stop_loss", "precio_salida", "razon_cierre", "dias_hasta_salida", "fecha_salida"]:
             decisiones[f"{campo}_{direccion}"] = [f[campo] for f in filas[direccion]]
     return decisiones
 
@@ -156,7 +179,7 @@ class USDCLPTradingEnvDiarioMultidia(gym.Env):
 
     def __init__(self, dataset_path=DATASET_PATH, dias_holding=1, slippage_pct=SLIPPAGE_PCT,
                  capital_inicial=CAPITAL_INICIAL, riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS,
-                 df=None, accion_continua=False):
+                 df=None, accion_continua=False, horizonte_tp=1):
         super().__init__()
         # df explicito = pasar un slice ya cargado (train/test split) sin
         # releer el CSV - mismo patron que 27_entorno_trading_rl_diario.py.
@@ -164,11 +187,19 @@ class USDCLPTradingEnvDiarioMultidia(gym.Env):
         # (sobre el dataset diario completo), no despues - submuestrear un
         # slice ya recortado desalinearia los bloques de dias_holding entre
         # ventanas del walk-forward. Ver 33_backtest_walkforward_diario_multidia.py.
+        #
+        # horizonte_tp (Issue #10, default=1 preserva el comportamiento
+        # original de 9.17-9.20): que forecast nhits_h{N} usar como objetivo
+        # de take-profit, independiente de dias_holding - se pueden combinar
+        # libremente (ej. horizonte_tp=5 con dias_holding=3 es un objetivo
+        # ambicioso en una ventana corta, valido de correr aunque rara vez
+        # se alcance).
         base = df.reset_index(drop=True) if df is not None else entorno_diario_mod.cargar_dataset(dataset_path)
         decisiones = construir_decisiones_multidia(base, dias_holding)
-        self.df = precomputar_salidas_tp_sl_multidia(decisiones, k_stop_loss)
+        self.df = precomputar_salidas_tp_sl_multidia(decisiones, k_stop_loss, horizonte_tp)
 
         self.dias_holding = dias_holding
+        self.horizonte_tp = horizonte_tp
         self.slippage_pct = slippage_pct
         self.capital_inicial = capital_inicial
         self.riesgo_max_pct = riesgo_max_pct
@@ -211,13 +242,14 @@ class USDCLPTradingEnvDiarioMultidia(gym.Env):
         capital_previo = self.capital
 
         if posicion == 0:
-            notional, pnl, razon = 0.0, 0.0, "plano"
+            notional, pnl, razon, dias_hasta_salida, fecha_salida = 0.0, 0.0, "plano", 0, fila["ds"]
         else:
             direccion = "largo" if posicion > 0 else "corto"
             signo = 1.0 if direccion == "largo" else -1.0
             distancia_riesgo = self.k_stop_loss * fila["vol_garch"]
             notional = abs(posicion) * (self.riesgo_max_pct * capital_previo) / distancia_riesgo if distancia_riesgo > 0 else 0.0
             precio_salida, razon = fila[f"precio_salida_{direccion}"], fila[f"razon_cierre_{direccion}"]
+            dias_hasta_salida, fecha_salida = fila[f"dias_hasta_salida_{direccion}"], fila[f"fecha_salida_{direccion}"]
             retorno_pct = signo * (precio_salida - fila["y"]) / fila["y"]
             costo_slippage = self.slippage_pct * notional if posicion != self._posicion_previa else 0.0
             pnl = notional * retorno_pct - costo_slippage
@@ -230,7 +262,8 @@ class USDCLPTradingEnvDiarioMultidia(gym.Env):
         terminated = self._paso >= len(self.df)
         obs = self._obs() if not terminated else np.zeros(len(FEATURES_ESTADO), dtype=np.float32)
         reward = pnl / capital_previo
-        info = {"posicion": posicion, "pnl": pnl, "notional": notional, "razon_cierre": razon, "capital": self.capital}
+        info = {"posicion": posicion, "pnl": pnl, "notional": notional, "razon_cierre": razon, "capital": self.capital,
+                "dias_hasta_salida": dias_hasta_salida, "fecha_salida": fecha_salida}
         return obs, float(reward), terminated, False, info
 
 
