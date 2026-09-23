@@ -127,6 +127,8 @@ El forecasting de arriba responde si un modelo predice bien el precio. Una exten
 
 **[Issue #11](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/11) prueba si el buen perfil de riesgo de N=7 (poco stop-loss, poco drawdown) se sostiene con ventanas aún más largas**: se extendió la grilla a N ∈ {10, 12, 14, 20} (20 combinaciones más, mismo dataset y entorno ya generalizados). **No es monótono**: en vez de seguir mejorando, aparecen dos zonas buenas separadas por un bache — N=5-7 (mejor Sharpe promedio, ~1.9-2.0) y N=14 (mejor drawdown y % de stop-loss promedio, superando incluso a N=7) — con N=10-12 empeorando en el medio (el % de stop-loss en N=10 es *peor* que en N=3/N=5) y N=20 colapsando (Sharpe promedio 0.35). Con solo 15-30 decisiones totales en estas combinaciones (contra 100 en N=3), buena parte del vaivén puede ser ruido de muestra chica — se documenta como limitación explícita, no se resuelve en esta sesión. 📄 **[Ver el detalle completo, con el gráfico resumen, en la sección 9.26 del paper](reportes/paper.md#926-issue-11-el-patrón-de-n7-menos-stop-loss-menos-drawdown-se-sostiene-con-ventanas-más-largas)**.
 
+**[Issue #12](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/12) prueba si la señal del cobre generaliza a otras monedas commodity** (AUD, CAD, NZD — radar-baseline ancla en Chen & Rogoff 2003 y Ferraro/Rogoff/Rossi 2015): se replicó el experimento de 9.17 en las tres monedas, reusando el mismo dataset/entorno/agente. **AUD y NZD replican o superan el resultado de CLP** (Umbral cobre: +692.0%/Sharpe 4.92 en AUD, +397.7%/Sharpe 3.84 en NZD, contra +532.3%/Sharpe 4.39 de CLP) — **CAD es claramente más débil** (+33.1%/Sharpe 0.86, y el PPO directamente pierde plata), consistente con la señal de alerta ya documentada (su commodity real es petróleo, no cobre, con reversión de signo histórica). En el camino se encontró y corrigió un bug de signo real (la heurística de "umbral cobre", escrita para la convención cruda de USD/CLP, daba la dirección invertida en series ya normalizadas del panel de 13 pares) y se verificó el apalancamiento implícito de cada operación — CAD operó con casi el triple de apalancamiento mediano que CLP (9.6x vs. 3.76x) y aun así rindió peor, reforzando que su debilidad es real y no un artefacto de sizing. **Patrón nuevo que se repite en las 4 monedas ya probadas**: el PPO pierde contra el umbral simple de cobre en todas — vale la pena cuestionar si la maquinaria del agente agrega valor neto frente a la señal sola. 📄 **[Ver el detalle completo, con las tablas de resultados y apalancamiento, en la sección 9.28 del paper](reportes/paper.md#928-issue-12-la-señal-del-cobre-generaliza-a-otras-monedas-commodity-aud-cad-nzd)**.
+
 ## Datos
 
 Tipo de cambio USD/CLP, serie diaria descargada con [`yfinance`](https://github.com/ranaroussi/yfinance) (ticker `CLP=X`, fuente: Yahoo Finance). Se guarda una copia cruda en `datos/bases/` para reproducibilidad exacta (no depender de que Yahoo siga sirviendo el mismo histórico).
@@ -177,7 +179,14 @@ codigos/
 ├── 40_backtest_walkforward_diario_grilla_nh.py  # Issue #10: grilla TP fijo por horizonte (h1-h5) x holding (N=3,5,7), 15 combinaciones
 ├── 41_graficos_grilla_nh_h4.py            # graficos de retorno en el tiempo y entrada/salida, h4 fijo comparando N
 ├── 42_backtest_walkforward_diario_grilla_nh_largo.py  # Issue #11: extiende la grilla a N=10,12,14,20 (mismo dataset/entorno del Issue #10)
-└── 43_graficos_resumen_grilla_nh_extendida.py  # Issue #11: Sharpe/drawdown/%stop-loss promedio por N, grilla completa (N=3 a 20)
+├── 43_graficos_resumen_grilla_nh_extendida.py  # Issue #11: Sharpe/drawdown/%stop-loss promedio por N, grilla completa (N=3 a 20)
+├── 44_heatmaps_grilla_nh.py      # Issue #11: heatmaps N x h de la grilla completa (retorno, saldo, drawdown, razon de cierre)
+├── 45_generar_dataset_rl_diario_aud.py  # Issue #12: dataset walk-forward diario para AUD/USD (mismo patron que 26, fuente: panel de 23)
+├── 46_generar_dataset_rl_diario_cad.py  # Issue #12: idem para USD/CAD
+├── 47_generar_dataset_rl_diario_nzd.py  # Issue #12: idem para NZD/USD
+├── 48_backtest_walkforward_diario_aud.py  # Issue #12: backtest final AUD (mismo esquema que 28) - PPO vs buy-and-hold vs umbral simple vs umbral cobre
+├── 49_backtest_walkforward_diario_cad.py  # Issue #12: idem para USD/CAD
+└── 50_backtest_walkforward_diario_nzd.py  # Issue #12: idem para NZD/USD
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
