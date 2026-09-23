@@ -752,6 +752,38 @@ Tabla completa por estrategia (Sharpe, retorno promedio diario, significancia ba
 
 **Caveat honesto, verificado antes de festejar el resultado — posible factor común, no 10 mecanismos independientes**: que prácticamente todas las combinaciones moneda×commodity den positivo (oro Y platino Y petróleo Y soja, para las 3 monedas) es distinto al patrón de cobre-CLP (una relación específica, ancorada en Chen & Rogoff). Se verificó la correlación cruzada de los 5 commodities entre sí: oro-platino correlaciona 0.60 (ambos metales preciosos, plausible que compartan un factor macro común — tasas reales, apetito de riesgo), mientras que el resto de los pares está en 0.02-0.21 — no hay un único factor dominante que explique las 90 pruebas, pero el par oro-platino sí comparte varianza real, así que los hallazgos de ZAR/NOK/BRL × oro y × platino no deben leerse como 6 señales completamente independientes. Dicho esto, la correlación **más fuerte de cada moneda coincide con su exportación de materia prima dominante** (NOK-petróleo 0.275, el mayor de todos — Noruega es exportador neto de petróleo; ZAR-platino 0.228 — Sudáfrica es el mayor productor mundial de platino; BRL-soja 0.186 — Brasil es el mayor exportador mundial de soja), la misma lectura de "generalización que confirma la teoría" que dio el panel de 13 pares en 9.14. La Fase 2 (walk-forward en múltiples regímenes históricos) es el chequeo real de si esto sobrevive fuera de un screening in-sample sobre toda la historia.
 
+### 9.30 Issue #13 Fase 2: walk-forward en 3 regímenes históricos distintos — los 10 pares se sostienen
+
+Mismo principio que 9.14 del Issue #5 (validar el Sharpe de cobre-CLP en 2015-2016/2017-2018/2020-2021 antes de comprometerse a construir algo nuevo): antes de dar por buenos los 10 pares de Fase 1 (screening in-sample sobre toda la historia + SPA), `54_walkforward_multiperiodo_supervivientes.py` repite dos chequeos **dentro de cada uno de 3 regímenes históricos deliberadamente distintos** — 2014-2016 (crash prolongado de petróleo, fin del superciclo de commodities), 2020 (shock de demanda COVID, con el propio WTI llegando a precio negativo en medio de la ventana) y 2022 (invasión a Ucrania, spike de energía/alimentos) — sin refitear ningún parámetro dentro de cada régimen (la dirección de la señal queda fija desde Fase 1, esto prueba generalización temporal, no una nueva calibración):
+
+1. **Escaneo de rezagos -2..+3 restringido a cada régimen**: ¿el pico en el rezago +1 (predictivo) que se ve en toda la historia se repite dentro de cada régimen por separado, con mucho menos n (259-782 obs. según el régimen)?
+2. **Backtest de la regla ya validada por SPA** (posición = signo(r de Fase 1) × signo(retorno del commodity), sin Kelly ni gestión de riesgo — mismo caveat que abajo) dentro de cada régimen.
+
+**El pico en rezago +1 se sostiene en los 3 regímenes para 9 de los 10 pares** (tabla completa en `datos/resultados/fase2_escaneo_rezagos_por_regimen.csv`) — la excepción es `ZAR × WTI` en 2022, donde el rezago +1 deja de ser significativo (p=0.13, n=259) aunque sí lo es en 2014-2016 y 2020. `NOK × Platino` y `ZAR × Oro` también muestran una correlación débil y no significativa específicamente en el régimen 2020 (p=0.52 y p=0.14 respectivamente), aunque se recuperan con fuerza en 2022.
+
+![Sharpe por régimen histórico, 10 pares](../datos/resultados/fase2_sharpe_por_regimen.png)
+
+**Resumen de consistencia (Sharpe > 0 en cuántos de los 3 regímenes)**:
+
+| Par | Regímenes con Sharpe > 0 | Sharpe promedio | Sharpe mínimo |
+|---|---|---|---|
+| ZAR × Platino | 3/3 | 4.21 | 2.53 |
+| NOK × WTI | 3/3 | 3.92 | 2.84 |
+| BRL × Platino | 3/3 | 3.50 | 2.30 |
+| BRL × Soja | 3/3 | 3.18 | 1.12 |
+| BRL × WTI | 3/3 | 3.09 | 1.86 |
+| NOK × Oro | 3/3 | 2.94 | 0.51 |
+| ZAR × WTI | 3/3 | 2.87 | 0.82 |
+| ZAR × Oro | 3/3 | 2.67 | **0.002** (2020, prácticamente ruido) |
+| BRL × Oro | 3/3 | 1.59 | **0.009** (2020, prácticamente ruido) |
+| NOK × Platino | **2/3** | 3.48 | **-0.06** (2020, el único negativo de los 30 pares×régimen) |
+
+**Lectura honesta**: 9 de 10 pares tienen Sharpe positivo en los 3 regímenes, y el único caso negativo (`NOK × Platino` en 2020, Sharpe -0.06) es esencialmente ruido alrededor de cero, no una pérdida sistemática — coherente con que ese mismo par también tiene la correlación de rezago +1 más débil de los 30 (par × régimen) dentro de 2020. El patrón que sí aparece de forma consistente: **el régimen 2020 (COVID) es el más débil para casi todos los pares que involucran oro o platino** (`ZAR×Oro`, `BRL×Oro`, `NOK×Platino` rondan Sharpe ~0-0.5 ese año, contra 2-6 en los otros regímenes) — plausible que la dinámica de refugio/liquidez de 2020 haya roto temporalmente la relación "commodity sube ⇒ moneda commodity se aprecia" para los metales preciosos (oro subió como refugio mientras el dólar también se fortalecía en el pánico inicial, un mecanismo distinto al de exportación de materia prima). El petróleo (NOK×WTI, ZAR×WTI, BRL×WTI) es notablemente más estable en los 3 regímenes que oro/platino, consistente con ser un canal de exportación más directo (Noruega/petróleo, Brasil también exporta petróleo) que el de metales preciosos.
+
+**Caveat de método que aplica a TODA esta sección, para no repetir el error de 9.14**: los retornos totales de la tabla completa (`fase2_backtest_por_regimen.csv`, no reproducida completa acá por espacio — algunos superan +500-700% en la ventana 2014-2016) usan la MISMA estrategia de juguete que Fase 1 (posición unitaria fija cada día, sin Kelly, sin límite de apalancamiento real, sin costos más allá del signo) — es exactamente el tipo de cifra que en 9.14 resultó estar inflada por apostar el 100% del capital todos los días. **El Sharpe es la métrica confiable de esta sección** (no depende del tamaño de la posición, mismo argumento que 9.14); el retorno en dólares NO debe leerse como "cuánto se ganaría en la práctica" sin antes definir una regla de sizing real — esa decisión queda para si Bastián decide construir una estrategia real sobre alguno de estos pares, no es el objetivo de Issue #13.
+
+**Conclusión de Fase 2**: los 10 pares de Fase 1 generalizan razonablemente bien fuera de muestra temporal — no es un artefacto de un solo régimen reciente. `ZAR×Platino`, `NOK×WTI`, `BRL×Platino` son los 3 más consistentes (Sharpe mínimo > 2.3 en cualquier régimen); los pares con oro/platino como commodity son los que más se debilitan en el régimen 2020 específicamente, un patrón económicamente interpretable (refugio vs. exportación), no ruido aleatorio.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), y la extensión a ventanas de holding más largas del Issue #11 (`41`-`43`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.

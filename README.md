@@ -180,7 +180,8 @@ codigos/
 ├── 43_graficos_resumen_grilla_nh_extendida.py  # Issue #11: Sharpe/drawdown/%stop-loss promedio por N, grilla completa (N=3 a 20)
 ├── 51_verificar_liquidez_commodities_nok.py  # Issue #13 Fase 0: liquidez de WTI/oro/platino/soja/hierro/NOK vs. umbral de litio, re-verifica ticks de BRL/ZAR
 ├── 52_screening_correlacion_commodities_fx.py  # Issue #13 Fase 1: NOK/ZAR/BRL x 5 commodities, escaneo de rezagos -2..+3, correccion FDR sobre 90 pruebas
-└── 53_bootstrap_spa_supervivientes.py  # Issue #13 Fase 1: refuerza los 10 supervivientes FDR (rezago +1) con bootstrap SPA de Hansen
+├── 53_bootstrap_spa_supervivientes.py  # Issue #13 Fase 1: refuerza los 10 supervivientes FDR (rezago +1) con bootstrap SPA de Hansen
+└── 54_walkforward_multiperiodo_supervivientes.py  # Issue #13 Fase 2: valida los 10 pares en 3 regimenes historicos (2014-2016, 2020, 2022), Sharpe por ventana
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
