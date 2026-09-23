@@ -1,0 +1,16 @@
+﻿                                                                     0                               1                               2                              3                                                4
+estrategia               elegida: combo[carry_n2_vt5+tsmom_k6_vt5]_vt5  componente carry: carry_n2_vt5  componente TSMOM: tsmom_k6_vt5  benchmark equiponderada larga  no hacer nada (caja USD; retorno en exceso = 0)
+desde                                                       2025-01-31                      2025-01-31                      2025-01-31                     2025-01-31                                              NaN
+hasta                                                       2026-08-31                      2026-08-31                      2026-08-31                     2026-08-31                                              NaN
+meses                                                               20                              20                              20                             20                                               20
+sharpe_bruto                                                     0.557                           4.102                          -1.062                          1.105                                              0.0
+sharpe_neto                                                      0.468                           4.067                          -1.197                          1.104                                              0.0
+ic95_bajo_neto                                                  -1.091                           1.955                           -2.92                         -0.024                                              NaN
+ic95_alto_neto                                                   2.739                           8.246                           0.271                          3.191                                              NaN
+sharpe_neto_estricto                                             0.235                           3.772                          -1.386                          0.997                                              NaN
+ret_anual_%_neto                                                 2.072                          10.027                          -6.194                          7.381                                              0.0
+vol_anual_%                                                      4.543                           2.529                            5.31                          6.862                                              NaN
+max_dd_%_neto                                                   -5.239                          -1.031                          -9.822                         -3.776                                              0.0
+turnover_anual                                                   8.671                           1.204                          13.549                          0.138                                              NaN
+sharpe_neto_pre_holdout                                          0.781                           0.619                           0.428                          0.141                                              NaN
+Error estandar aproximado de un Sharpe anual con 20 meses: 0.77
