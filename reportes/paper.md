@@ -1085,6 +1085,16 @@ La protección que sí funciona ya está incluida: la volatilidad objetivo, que 
 - El **trailing de la cartera** es el peor de los tres.
 - Con 82 pruebas registradas en el Issue #15, el Sharpe máximo esperado por azar es 0.49.
 
+**Tercera extensión: momentum de 3 meses y stops por grupo** (`85_cartera_fx_stops_por_grupo.py`, 25 pruebas más; total del Issue #15: 107, Sharpe máximo esperado por azar 0.51).
+
+- **Momentum de 3 vs. 6 meses**: 3 meses es peor solo (Sharpe neto 0.17 vs. 0.43, caída máxima -29.6% vs. -18.6%; ya estaba en 81) y dentro de la combinación (0.58 vs. 0.78).
+- **Carry, por pata** (sin stops): la pata larga (2 tasas más altas) aporta +2.6% al año; la corta (2 tasas más bajas), +0.7%.
+  - Stops solo en la pata corta: no ayudan (Sharpe 0.54-0.62, caídas iguales o peores).
+  - **Trailing solo en la pata larga** (1.5σ-2σ): Sharpe 0.64-0.65 vs. 0.62, caída máxima -13.1% vs. -12.8%. Pero el peor mes pasa de -7.6% a -3.1/-3.4% y feb-mar 2020 de -9.5% a -0.1/-3.5%, con 3-5 cierres al año. Es el único trailing del Issue que mejora el perfil de cola sin costar Sharpe.
+  - Advertencia: esto se encontró después de 100+ pruebas mirando el mismo período. La mejora de Sharpe (+0.03) es ruido; la de cola es más grande y estable entre k=1.5 y 2, pero descansa en pocos episodios (2008, 2020). No se adopta sin confirmarlo en meses nuevos.
+- **Momentum 6m, por volatilidad** (sin stops): la mitad menos volátil (monedas G10 tranquilas) aporta +2.5% al año (Sharpe del aporte 0.67); la más volátil, +0.4% (0.14). Stops o trailing en cualquiera de las dos mitades dejan el Sharpe entre 0.29 y 0.46: no cambian nada relevante.
+  - Que el momentum viva en las monedas menos volátiles es una observación, no una estrategia probada: operar solo esa mitad sería una configuración elegida mirando este resultado.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), la extensión a ventanas de holding más largas del Issue #11 (`41`-`44`), la extensión a monedas commodity del Issue #12 (`45`-`50`), y la extensión a commodities nuevos y monedas NOK/ZAR/BRL del Issue #13 (`51`-`57`) — ver `README.md` del repositorio para el detalle de cada uno), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.

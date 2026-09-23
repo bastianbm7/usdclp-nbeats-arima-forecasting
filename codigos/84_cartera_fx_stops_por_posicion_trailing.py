@@ -67,7 +67,9 @@ def indice_retorno_total(D, P):
     return TRI
 
 
-def backtest(D, P, TRI, cfg, metodo, k):
+def backtest(D, P, TRI, cfg, metodo, k, filtro=None):
+    """filtro(D, t, w) -> conjunto de monedas a las que se les aplica el stop
+    (None = todas). Lo usa 85 para probar el stop solo en un grupo."""
     ds, mon = D["ds"], D["monedas"]
     s = pd.Series(cf.SPREADS).reindex(mon)
     sigma_cartera = cfg["vol_obj"] / np.sqrt(12)
@@ -88,9 +90,10 @@ def backtest(D, P, TRI, cfg, metodo, k):
         # seguimiento por moneda: se mantiene si la posicion sigue en la misma direccion
         if metodo != "trailing_cartera":
             vol_i = cf.vol_activos(D, t).reindex(mon)
+            elegibles_stop = set(mon) if filtro is None else set(filtro(D, t, w))
             for m in mon:
                 sg = np.sign(w[m])
-                if sg == 0:
+                if sg == 0 or m not in elegibles_stop:
                     seg.pop(m, None)
                 elif m not in seg or seg[m]["signo"] != sg:
                     if ds[t] in TRI.index and np.isfinite(TRI.at[ds[t], m]) and np.isfinite(vol_i[m]):
