@@ -1095,6 +1095,21 @@ La protección que sí funciona ya está incluida: la volatilidad objetivo, que 
 - **Momentum 6m, por volatilidad** (sin stops): la mitad menos volátil (monedas G10 tranquilas) aporta +2.5% al año (Sharpe del aporte 0.67); la más volátil, +0.4% (0.14). Stops o trailing en cualquiera de las dos mitades dejan el Sharpe entre 0.29 y 0.46: no cambian nada relevante.
   - Que el momentum viva en las monedas menos volátiles es una observación, no una estrategia probada: operar solo esa mitad sería una configuración elegida mirando este resultado.
 
+**Estrategia armada con esas dos observaciones** (`86_cartera_fx_estrategia_patas_largas_baja_vol.py`, 6 pruebas nuevas; total del Issue #15: 113). El trailing queda fijo en 1.5σ y se prueban dos lecturas de "solo patas largas":
+
+| 2000-2024, neto | Sharpe [IC95] | Retorno anual | Caída máx. | Peor mes | 2020 feb-mar | Sharpe 2017-2024 |
+|---|---|---|---|---|---|---|
+| Original (carry + momentum 6m) | 0.78 [0.36, 1.22] | 4.2% | -14.0% | -4.2% | -3.1% | 0.15 |
+| Original + trailing en pata larga del carry | 0.79 | 4.3% | -14.0% | -3.5% | +7.5% | 0.25 |
+| Momentum 6m solo mitad menos volátil | 0.60 | 3.6% | -17.8% | -4.6% | +9.4% | 0.12 |
+| Carry solo pata larga (sin vender las de tasa baja) | 0.42 | 2.4% | -22.2% | -8.9% | -11.1% | 0.06 |
+| **(a) Carry completo c/ trailing pata larga + momentum baja vol** | **0.91 [0.49, 1.33]** | **5.1%** | -14.3% | -3.5% | +7.6% | **0.40** |
+| (b) Carry solo pata larga c/ trailing + momentum baja vol | 0.69 | 4.0% | -19.8% | -3.7% | +8.0% | 0.22 |
+
+- **La lectura (b) empeora.** Sin la pata corta, el carry deja de ser una apuesta relativa entre monedas y pasa a ser una apuesta direccional contra el dólar (correlación 0.49 con el S&P 500). La pata corta es poco rentable, pero es la cobertura.
+- **La (a) es la mejor de todo el Issue** (0.91), y mejora en los tres subperíodos, incluido el último (0.40 vs. 0.15).
+- **Este número está sobreestimado por construcción**: sus dos ingredientes se eligieron mirando 2000-2024, y se evalúan en ese mismo período. La diferencia con la original (+0.13) es menor que el error del Sharpe (±0.4). Es el candidato más prometedor para confirmar fuera de muestra, no un resultado confirmado.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), la extensión a ventanas de holding más largas del Issue #11 (`41`-`44`), la extensión a monedas commodity del Issue #12 (`45`-`50`), y la extensión a commodities nuevos y monedas NOK/ZAR/BRL del Issue #13 (`51`-`57`) — ver `README.md` del repositorio para el detalle de cada uno), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.

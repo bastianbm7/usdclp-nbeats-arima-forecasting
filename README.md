@@ -237,7 +237,8 @@ codigos/
 ├── 82_cartera_fx_holdout.py      # apertura UNICA del hold-out (2025-01..2026-08) para la configuracion elegida por 81
 ├── 83_cartera_fx_stop_take_profit.py  # extension: stop-loss/take-profit diario dentro del mes (33 variantes, sin hold-out) - ninguna mejora el Sharpe
 ├── 84_cartera_fx_stops_por_posicion_trailing.py  # stop por moneda, trailing por moneda (arrastra el maximo entre meses) y trailing de cartera (27 variantes)
-└── 85_cartera_fx_stops_por_grupo.py  # momentum 3m vs 6m; stops solo en la pata larga/corta del carry o en la mitad mas/menos volatil del momentum (25 variantes)
+├── 85_cartera_fx_stops_por_grupo.py  # momentum 3m vs 6m; stops solo en la pata larga/corta del carry o en la mitad mas/menos volatil del momentum (25 variantes)
+└── 86_cartera_fx_estrategia_patas_largas_baja_vol.py  # estrategia: carry con trailing en la pata larga + momentum solo en monedas de baja vol (evaluada en el mismo periodo que la origino)
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
