@@ -235,7 +235,8 @@ codigos/
 ├── cartera_fx.py                 # motor: retorno en exceso con carry (CIP), carry/TSMOM/combinacion, vol targeting con datos pasados, costo sobre turnover
 ├── 81_cartera_fx_seleccion_pre_holdout.py  # 21 variantes evaluadas solo con retornos < 2025-01-01, registro de pruebas, eleccion de la configuracion
 ├── 82_cartera_fx_holdout.py      # apertura UNICA del hold-out (2025-01..2026-08) para la configuracion elegida por 81
-└── 83_cartera_fx_stop_take_profit.py  # extension: stop-loss/take-profit diario dentro del mes (33 variantes, sin hold-out) - ninguna mejora el Sharpe
+├── 83_cartera_fx_stop_take_profit.py  # extension: stop-loss/take-profit diario dentro del mes (33 variantes, sin hold-out) - ninguna mejora el Sharpe
+└── 84_cartera_fx_stops_por_posicion_trailing.py  # stop por moneda, trailing por moneda (arrastra el maximo entre meses) y trailing de cartera (27 variantes)
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP

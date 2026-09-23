@@ -1064,6 +1064,27 @@ El stop achica el peor mes del carry (-7.6% → -4.4%), pero **agranda la caída
 
 La protección que sí funciona ya está incluida: la volatilidad objetivo, que achica la posición cuando sube el riesgo, y la combinación con momentum, que gana en esas mismas crisis.
 
+**Segunda extensión: stops por moneda y trailing stops** (`84_cartera_fx_stops_por_posicion_trailing.py`, 27 variantes más, solo stop-loss). Se probaron tres reglas, con umbral k ∈ {1, 1.5, 2} veces la σ mensual:
+
+- **Stop por moneda**: cierra solo la moneda cuyo retorno desde la apertura cae a -k·σ_i, con σ_i = su vol ex-ante / √12.
+- **Trailing por moneda**: mide la caída desde el máximo que alcanzó la posición desde que se abrió, arrastrando ese máximo entre meses si la posición sigue.
+- **Trailing de la cartera**: sobre el retorno del mes.
+
+| 2000-2024, neto | Carry: Sharpe / DD máx. / 2020 | Momentum: Sharpe / DD | Combinación: Sharpe / DD / 2008 / 2020 | Posiciones cerradas/año (combinación) |
+|---|---|---|---|---|
+| Sin stop | 0.62 / -12.8% / -9.5% | 0.43 / -18.6% | 0.78 / -14.0% / -3.9% / -3.1% | — |
+| Stop por moneda 1σ | **0.65 / -11.0%** / -7.3% | **0.47 / -15.7%** | **0.79 / -13.0% / -2.3% / -1.5%** | 12 |
+| Stop por moneda 1.5σ | 0.62 / -14.1% / -9.7% | 0.40 / -19.4% | 0.72 / -14.6% / -3.0% / -4.9% | 6 |
+| Trailing por moneda 1.5σ | 0.61 / -18.1% / **-1.7%** | 0.37 / -16.7% | 0.68 / -16.3% / -3.0% / +7.3% | 35 |
+| Trailing de cartera 2σ | 0.52 / -22.4% / -6.4% | 0.37 / -17.4% | 0.63 / -17.3% / -5.4% / -4.9% | 9 |
+
+**Lectura**:
+
+- El **stop por moneda de 1σ** es la única regla que no empeora nada en las tres estrategias. Sube el Sharpe entre 0.01 y 0.04, reduce la caída máxima 1-3 puntos y achica los meses de crisis. Pero la mejora es mucho menor que el error del Sharpe (±0.4) y **no es monótona**: con 1.5σ y 2σ vuelve a quedar igual o peor que sin stop. Es consistente con ruido; no se adopta sin confirmación fuera de muestra.
+- El **trailing por moneda** sí corta las crisis: el carry pasa de -9.5% a -1.7% en feb-mar 2020. Pero cierra 20-65 posiciones al año por retrocesos normales, paga spread en cada una y se pierde los rebotes. Termina con menor Sharpe y **mayor** caída máxima en carry y en la combinación. En una prima que se gana de a poco, el ruido normal retrocede 1-2σ seguido: el trailing no "asegura ganancias", corta posiciones que después se recuperan.
+- El **trailing de la cartera** es el peor de los tres.
+- Con 82 pruebas registradas en el Issue #15, el Sharpe máximo esperado por azar es 0.49.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), la extensión a ventanas de holding más largas del Issue #11 (`41`-`44`), la extensión a monedas commodity del Issue #12 (`45`-`50`), y la extensión a commodities nuevos y monedas NOK/ZAR/BRL del Issue #13 (`51`-`57`) — ver `README.md` del repositorio para el detalle de cada uno), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
