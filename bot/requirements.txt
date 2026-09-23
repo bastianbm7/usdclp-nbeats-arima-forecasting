@@ -1,0 +1,14 @@
+# Dependencias del bot de paper trading (venv propio en bot/.venv).
+# Núcleo: requests + pandas + python-dotenv (+ tzdata para zonas horarias en Windows).
+requests==2.34.2
+pandas==3.0.6
+numpy==2.5.3
+python-dotenv==1.2.3
+tzdata==2026.4
+# Fallback de datos gratuito para MODO=simulado sin token OANDA (timestamps ambiguos, ver README).
+yfinance==1.7.0
+# Dashboard
+streamlit==1.64.0
+plotly==7.1.0
+# Tests
+pytest==9.1.1
