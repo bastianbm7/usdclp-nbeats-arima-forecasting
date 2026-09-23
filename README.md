@@ -140,6 +140,8 @@ La conclusión de toda la extensión de RL vuelve a ser la que ya daba la línea
 
 **[Issue #14](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/14) — variables nuevas a frecuencia semanal/mensual, después de la errata.** Las variables del propio precio de USD/CLP no dependían del error de timestamp. El cobre semanal sí: re-verificado, pasa de -0.10 a +0.04. Se probaron 18 variables nuevas (VIX, S&P 500, emergentes, acciones chilenas, petróleo, dólar global, bono a 2 años, carry), cada una con la hora real de publicación de su dato, reservando 2025-2026 como hold-out intocable y registrando todas las pruebas. **Ninguna sobrevive la corrección por pruebas múltiples**, y el hold-out no se abrió. La única pista es el nivel del VIX: después de semanas de estrés, las monedas de riesgo tienden a recuperarse (USD/CLP semanal, Sharpe neto 0.66 [0.11, 1.20] con carry y costos). Con una regla fija en otras 11 monedas, la dirección se repite en 8 de 9 monedas de riesgo y es ≈0 en los refugios, pero ningún IC95 excluye el cero. Es una pista débil de cartera, no un bot de CLP. 📄 **[Sección 9.36 del paper](reportes/paper.md)**.
 
+**[Issue #15](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/15) — cartera mensual de primas de riesgo FX (carry + momentum) en 14 monedas, incluida CLP.** Cambia la pregunta: en vez de predecir USD/CLP mañana, cosechar primas con respaldo académico a rebalanceo mensual. Spot de FRED H.10 (hora conocida) y CLP de Yahoo limpio; tasas OECD con 2 meses de rezago de publicación; costo = spread ida y vuelta sobre el turnover. Con selección solo con 2000-2024 (21 variantes registradas, Sharpe máximo esperado por azar 0.38): carry neto 0.62 [0.17, 1.10], momentum de 6 meses 0.44 [0.06, 0.84], **combinación 50/50 0.78 [0.36, 1.22]** (bruto 0.85, drawdown máximo -14% con 5% de vol objetivo). Es el primer resultado del proyecto que supera el máximo esperado por azar con un IC95 que excluye el cero, y cae en el rango académico. Hay tres salvedades. El premio se concentra en 2000-2008 (1.59 → 0.47 → 0.15 por subperíodo). Brasil aporta ~40% del retorno bruto y su carry está sobreestimado; sin BRL, 0.52. CLP casi no pesa. **Hold-out (apertura única, 20 meses)**: combinación 0.47 neto [-1.09, 2.74]. Es positivo, pero con 20 meses no discrimina. 📄 **[Sección 9.37 del paper](reportes/paper.md)**.
+
 ## Datos
 
 Tipo de cambio USD/CLP, serie diaria descargada con [`yfinance`](https://github.com/ranaroussi/yfinance) (ticker `CLP=X`, fuente: Yahoo Finance). Se guarda una copia cruda en `datos/bases/` para reproducibilidad exacta (no depender de que Yahoo siga sirviendo el mismo histórico).
@@ -226,7 +228,18 @@ codigos/
 ├── 68_features_semanales_mensuales_corregido.py  # re-verifica cobre/tasas semanales y mensuales (19/21) con la alineacion estricta
 ├── 69_variables_externas_clp.py  # descarga VIX, S&P 500, EEM, ECH, WTI, DXY amplio, bono 2 anos, tasas 3m, con la hora real de publicacion de cada dato
 ├── 70_screening_backtest_variables_clp.py  # screening FDR (24 pruebas, sin hold-out) + backtest walk-forward con carry y costos de cada variable
-└── 71_confirmacion_vix_otras_monedas.py  # confirma la pista del VIX con una regla fija en 11 monedas que no formularon la hipotesis
+├── 71_confirmacion_vix_otras_monedas.py  # confirma la pista del VIX con una regla fija en 11 monedas que no formularon la hipotesis
+│
+│   # --- Issue #15: cartera mensual de primas de riesgo FX (carry + momentum), 14 monedas incl. CLP ---
+├── 80_datos_cartera_fx_mensual.py  # spot FRED H.10 (mediodia NY) de 13 monedas + CLP=X Yahoo limpio, tasas 3m OECD con 2 meses de rezago -> datos/bases/cartera_fx_mensual.csv
+├── cartera_fx.py                 # motor: retorno en exceso con carry (CIP), carry/TSMOM/combinacion, vol targeting con datos pasados, costo sobre turnover
+├── 81_cartera_fx_seleccion_pre_holdout.py  # 21 variantes evaluadas solo con retornos < 2025-01-01, registro de pruebas, eleccion de la configuracion
+├── 82_cartera_fx_holdout.py      # apertura UNICA del hold-out (2025-01..2026-08) para la configuracion elegida por 81
+├── 83_cartera_fx_stop_take_profit.py  # extension: stop-loss/take-profit diario dentro del mes (33 variantes, sin hold-out) - ninguna mejora el Sharpe
+├── 84_cartera_fx_stops_por_posicion_trailing.py  # stop por moneda, trailing por moneda (arrastra el maximo entre meses) y trailing de cartera (27 variantes)
+├── 85_cartera_fx_stops_por_grupo.py  # momentum 3m vs 6m; stops solo en la pata larga/corta del carry o en la mitad mas/menos volatil del momentum (25 variantes)
+├── 86_cartera_fx_estrategia_patas_largas_baja_vol.py  # estrategia: carry con trailing en la pata larga + momentum solo en monedas de baja vol (evaluada en el mismo periodo que la origino)
+└── 87_cartera_fx_holdout_estrategia_a.py  # apertura UNICA del hold-out para la estrategia (a) de 86 + resultados desde 2015 y por anio
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP

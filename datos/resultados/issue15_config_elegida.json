@@ -1,0 +1,21 @@
+{
+ "estrategia": "combo[carry_n2_vt5+tsmom_k6_vt5]_vt5",
+ "config": {
+  "tipo": "combo",
+  "carry": {
+   "tipo": "carry",
+   "n_pata": 2,
+   "vol_obj": 0.05
+  },
+  "tsmom": {
+   "tipo": "tsmom",
+   "lookback": 6,
+   "vol_obj": 0.05
+  },
+  "vol_obj": 0.05
+ },
+ "n_pruebas_pre_holdout": 21,
+ "sharpe_max_esperado_H0": 0.3844211866939025,
+ "criterio": "max Sharpe neto pre-hold-out",
+ "fecha_limite_datos_seleccion": "2025-01-01"
+}
