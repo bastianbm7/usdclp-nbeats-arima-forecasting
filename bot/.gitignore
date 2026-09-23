@@ -1,0 +1,10 @@
+# Secretos y estado local del bot: NUNCA al repo.
+.env
+.venv/
+data/
+logs/
+*.db
+*.db-journal
+*.lock
+__pycache__/
+.pytest_cache/
