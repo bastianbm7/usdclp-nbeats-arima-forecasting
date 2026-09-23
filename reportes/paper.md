@@ -961,6 +961,90 @@ La dirección es coherente con la hipótesis (8 de 9 monedas de riesgo positivas
 
 **Pendiente** (bloqueado por datos, [Issue #16](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/16)): posiciones en forwards de las AFP, sorpresas de TPM contra la Encuesta de Expectativas y EMBI Chile requieren la API del BCCh o descargas manuales de la Superintendencia de Pensiones.
 
+### 9.37 Issue #15: cartera mensual de primas de riesgo FX — carry + momentum en 14 monedas, incluida CLP (2026-09-23)
+
+El [Issue #15](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/15) cambia la pregunta. Ya no se intenta predecir USD/CLP mañana. Se prueba si una cartera mensual cosecha las dos primas FX con más respaldo académico: **carry**, largo en monedas de tasa alta y corto en las de tasa baja (Lustig & Verdelhan 2007; Menkhoff, Sarno, Schmeling & Schrimpf 2012), y **momentum de serie de tiempo** (TSMOM), en la dirección del retorno pasado de cada moneda (Moskowitz, Ooi & Pedersen 2012). A rebalanceo mensual el spread deja de ser el problema: el costo principal medido fue de ~0.07 puntos de Sharpe, contra el ~37% anual del notional que costaba operar CLP a diario (9.35.2). Se aplica el mismo protocolo que en 9.36: hold-out intocable desde 2025-01-01 y registro de todas las variantes.
+
+**Datos** (`80_datos_cartera_fx_mensual.py`; `datos/bases/cartera_fx_mensual.csv`, validación en `issue15_validacion_datos.csv`):
+
+- **Universo**: 14 monedas contra USD. Trece vienen de **FRED H.10**, el tipo comprador del mediodía de Nueva York publicado por la Reserva Federal: EUR, GBP, JPY, CHF, CAD, AUD, NZD, NOK, SEK, MXN, ZAR, KRW y BRL. La hora es conocida y la serie es la misma que se usó para validar la errata en 9.35.1 C. **CLP** no está en H.10 y viene de Yahoo `CLP=X`. Quedan fuera COP, PEN, INR y SGD porque FRED no tiene una tasa corta para ellas, y las monedas con tipo de cambio fijo.
+- **Timestamps**: el rebalanceo es el último día hábil H.10 de cada mes. Se ejecuta al precio H.10 de ese día, a las 12:00 ET. Para CLP se ejecuta en la **primera barra Yahoo posterior** a ese mediodía: ~8 h después, o ~55 h cuando el mes termina en viernes, porque la barra siguiente es la del lunes a las 00:00 UTC. Las **señales** usan solo precios con timestamp estrictamente anterior al mediodía del rebalanceo (`alineacion_temporal.valor_conocido`). Para H.10 es el día hábil anterior; para CLP, la barra de ~20:00 NY del día anterior. La vol se estima con retornos diarios de fecha anterior al rebalanceo, y la barra Yahoo se reetiqueta a su reloj real.
+- **Limpieza de CLP**: se eliminaron 178 precios repetidos. También se descartaron 37 barras que se desvían más de 5% del dólar observado del BCCh (mindicador.cl) de la fecha más cercana. Entre ellas están dos días en que Yahoo publica el precio dividido por 100: 5.46 el 2014-04-10 y 5.00 el 2016-12-22. Tras la limpieza, la correlación de retornos mensuales entre Yahoo y el dólar observado es 0.93 en 273 meses, con un desvío mediano de nivel de 0.8%. El observado se usa solo como filtro: es un promedio de transacciones del día anterior, no un precio operable.
+- **Tasas**: interbancaria a 3 meses de la OECD en FRED (`IR3TIB01xxM156N`), en promedio mensual. Para Brasil, que no tiene serie a 3 meses, se usa la tasa call money (`IRSTCI01BRM156N`, ≈ Selic). **Rezago de publicación supuesto: 2 meses.** La señal de un rebalanceo a fin del mes M usa la tasa del mes M-2. El 2026-09-23, el último dato publicado era el de agosto para EE.UU. y el de julio o agosto para casi todos los demás. Zona euro y Reino Unido estaban atrasados hasta 2026-01, así que en el hold-out se arrastra su último valor, con un máximo de 6 meses (conservador y nunca futuro). El **devengo**, que es el carry que paga la posición entre t y t+1, usa la tasa del mes M como proxy de la prima forward. En la realidad esa prima la fija el precio forward en t, conocido por el mercado, y nunca se usa para decidir. **Sensibilidad**: el mejor carry con tasas sin rezago tiene Sharpe bruto 0.64, idéntico al de 2 meses de rezago. Las tasas son tan persistentes que el supuesto no mueve el resultado.
+- **Limitación principal de datos**: la tasa interbancaria local reemplaza al forward real, lo que ignora las desviaciones de la paridad cubierta (CIP). Esas desviaciones pesan en los mercados NDF (BRL, KRW, CLP) y, desde 2008, también en JPY, CHF y EUR. Para BRL, la tasa implícita en el NDF offshore suele quedar algo por debajo de la Selic (el "cupom cambial"), así que **el carry de BRL está sobreestimado**. Ver la sensibilidad sin BRL más abajo.
+
+**Construcción** (`cartera_fx.py`):
+
+- **Retorno en exceso** de estar largo en la moneda i contra USD, con CIP: X = (S_{t+1}/S_t) · (1 + i_i τ)/(1 + i_US τ) − 1. Es un retorno sobre la caja en USD, así que "no hacer nada" equivale a 0.
+- **Carry**: se ordenan las monedas elegibles por la tasa de señal (con rezago). La cartera va larga en las n de tasa más alta y corta en las n de tasa más baja, con pesos iguales por pata, y queda neutral al dólar.
+- **TSMOM de k meses**: la señal es el signo del retorno en exceso pasado de cada moneda. Ese retorno va desde el precio de ejecución de t−k hasta el precio de señal de t, más el carry ya devengado. Cada peso es 1/σ_i. La variante "ens" promedia los signos de 1, 3, 6 y 12 meses.
+- **Combinación**: 50/50 de las carteras de carry y TSMOM, cada una ya con su vol objetivo, y después se reescala la suma.
+- **Vol targeting**: escala = vol objetivo / vol ex ante de la cartera. La vol ex ante se calcula con los retornos diarios de los últimos 126 días hábiles anteriores al rebalanceo. La exposición bruta Σ|w| tiene un tope de 4×. La ventana y el tope se fijaron a priori.
+- **Costo principal**: el spread ida y vuelta completo de `SPREAD_IDA_VUELTA` sobre el turnover real, Σ|w_t − w_{t−1}^{deriva}|, donde la deriva lleva el peso anterior al precio actual. Es el doble de la convención de medio spread por operación y cubre, a grandes rasgos, el roll del forward. Para SEK y KRW, que el módulo no tenía, se suponen 0.05% y 0.10%. El **costo estricto** agrega una ida y vuelta completa sobre toda la posición cada mes, como si se cerrara y reabriera todo. Es el "1.8%/año del notional" que anticipaba el Issue para CLP.
+
+**Selección, solo con retornos de 2000-01 a 2024-12** (300 meses; `81_cartera_fx_seleccion_pre_holdout.py`, `issue15_pre_holdout_configuraciones.csv`). Se probaron **21 variantes**, todas anotadas en `registro_pruebas.csv`. Las candidatas fueron carry con n ∈ {2, 3, 4} por pata y TSMOM con k ∈ {1, 3, 6, 12, ens}, ambas con vol objetivo de 5% o 10%. Con los ganadores de cada familia (carry n=2 y TSMOM k=6) se armó la combinación, también con 5% o 10%. Fuera de la competencia se corrieron dos sensibilidades (tasas sin rezago y combinación sin BRL) y el benchmark equiponderado. **El Sharpe máximo esperado por azar entre 21 pruebas con T = 300 meses es 0.38** (Bailey & López de Prado). Es un umbral conservador, porque los pares 5%/10% son casi la misma estrategia. El criterio, fijado antes de correr, fue el Sharpe neto; la combinación es la candidata que pedía el Issue.
+
+![Capital y drawdown antes del hold-out](../datos/resultados/issue15_capital_drawdown_pre_holdout.png)
+
+| 2000-01 a 2024-12 (300 meses) | Sharpe bruto [IC95] | **Sharpe neto [IC95]** | Neto estricto | Retorno anual | Vol | Máx. DD | Turnover/año | 2008-08..12 | 2020-02..03 | Corr. S&P 500 | Corr. ΔVIX |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Carry n=2, vol 5% | 0.64 [0.19, 1.12] | **0.62 [0.17, 1.10]** | 0.48 | 3.2% | 5.2% | -12.8% | 1.4× | -6.9% | -9.5% | 0.37 | -0.38 |
+| TSMOM 6 meses, vol 10% | 0.52 [0.14, 0.91] | **0.44 [0.06, 0.84]** | 0.30 | 4.8% | 10.9% | -32.5% | 16.5× | +1.8% | +7.6% | -0.15 | 0.16 |
+| **Combinación 50/50, vol 5% (elegida)** | 0.85 [0.43, 1.29] | **0.78 [0.36, 1.22]** | 0.60 | 4.2% | 5.4% | -14.0% | 7.4× | -3.9% | -3.1% | 0.10 | -0.12 |
+| Equiponderada larga (sin vol target) | 0.14 [-0.28, 0.58] | 0.14 [-0.28, 0.57] | 0.06 | 1.2% | 8.2% | -32.0% | 0.2× | -17.7% | -7.5% | 0.56 | -0.50 |
+| No hacer nada (caja USD) | 0 | 0 | 0 | 0% | 0% | 0% | 0 | 0% | 0% | — | — |
+
+IC95 por bootstrap circular de bloques de 6 meses. Retorno, vol y drawdown son netos. Las demás variantes (`issue15_sharpe_variantes_pre_holdout.png`) dan: carry n=3 y n=4 con 0.51-0.53 neto; TSMOM de 1 mes con -0.07 a -0.04; de 3 meses, 0.17; de 12 meses, 0.27-0.28; "ens", 0.31-0.32. Las versiones con vol de 10% del carry dan el mismo Sharpe, porque no saturan el tope. En TSMOM saturan el 5-18% de los meses.
+
+Lo que muestra la tabla:
+
+1. **Carry y momentum aparecen con el tamaño que espera la literatura**, no con los Sharpe de 4-5 del proyecto original. El carry bruto de 0.64 cae dentro del rango académico de 0.3-0.7. Su retorno viene del diferencial devengado (+4.1%/año); el spot lo erosiona en parte (-0.8%/año), como predice la falla parcial de la paridad descubierta. El TSMOM, en cambio, saca del spot 3.6 de sus 5.7 puntos anuales brutos.
+2. **Los crashes del carry están**: -9.5% en febrero-marzo de 2020, con el peor mes en 2020-03 (-7.6%), y -6.9% entre agosto y diciembre de 2008. El carry correlaciona +0.37 con el S&P 500 y -0.38 con los cambios del VIX: es una prima por riesgo de crash, no alfa. El vol targeting (vol estimada con datos pasados) atenúa 2008, pero no lo evita. La cartera larga equiponderada sin vol targeting perdió -17.7% en ese período.
+3. **Momentum cubre los crashes del carry**: ganó en 2008 y en 2020, y su correlación con el S&P es negativa. Por eso la combinación tiene mejor Sharpe que cada parte (0.78, con drawdown de -14% a 5% de vol) y casi no correlaciona con acciones (0.10).
+4. **Estabilidad en el tiempo** (`issue15_subperiodos_pre_holdout.csv`), Sharpe neto:
+
+| Subperíodo | Carry | TSMOM | Combinación | Equiponderada |
+|---|---|---|---|---|
+| 2000-2008 | 1.04 | 1.14 | 1.59 | 0.41 |
+| 2009-2016 | 0.27 | 0.34 | 0.47 | 0.15 |
+| 2017-2024 | 0.43 | -0.21 | 0.15 | -0.17 |
+
+La prima se concentra en 2000-2008, el período en que la literatura la descubrió y publicó, y decae después. Es el patrón conocido de las anomalías que dejan de pagar tras publicarse (McLean & Pontiff 2016), y en FX el momentum es el más afectado. **La combinación en 2017-2024 vale 0.15.** Un Sharpe de 0.78 sobre los 25 años no es una predicción razonable para los próximos años.
+5. **Quién aporta** (`issue15_contribucion_por_moneda_pre_holdout.csv`, combinación, bruto): **BRL aporta 1.8 de 4.6 puntos anuales (~40%)**; la cartera estuvo larga en BRL el 90% de los meses. Le siguen ZAR (0.6) y SEK (0.5). CHF quedó corto el 98% de los meses y JPY el 73%, como monedas de financiamiento. **CLP casi no pesa**: tuvo peso absoluto medio de 5% y aportó +0.11 puntos anuales. Su tasa suele quedar en la mitad del ranking, así que en carry con n=2 rara vez entra en una pata. **Sensibilidad sin BRL**: 0.58 bruto y 0.52 neto [0.12, 0.94]. La combinación sigue siendo positiva, pero una parte del resultado depende de la moneda cuyo carry está peor medido.
+6. **Costos**: el costo principal resta 0.07 de Sharpe a la combinación, que rota 7.4 veces el capital al año, sobre todo por el TSMOM. El costo estricto, con cierre y reapertura mensual, deja 0.60. A esta frecuencia el spread ya no es lo que decide.
+7. **Chequeo de cordura** (todo Sharpe mayor que 1.5 obliga a revisar): ninguna variante pasa 1.5 antes del hold-out. Los chequeos de timing están en el código: aserciones en 80 (señal < rebalanceo ≤ ejecución, rezago de tasa ≥ 2 meses) y ventana de vol con fecha < rebalanceo.
+
+**Hold-out: apertura única** (`82_cartera_fx_holdout.py`, `issue15_holdout_resultado.csv`). La configuración elegida se leyó de `issue15_config_elegida.json`, que quedó comprometido en git (commit `f023f1e`) antes de abrir el hold-out. La apertura quedó anotada en el registro con `usa_holdout=True`, y el script se niega a correr de nuevo. Los componentes y el benchmark se muestran como descomposición de la misma apertura; no se eligió entre ellos.
+
+![Hold-out](../datos/resultados/issue15_holdout.png)
+
+| Hold-out 2025-01 a 2026-08 (20 meses) | Sharpe bruto | **Sharpe neto [IC95]** | Neto estricto | Retorno anual neto | Vol | Máx. DD | Sharpe neto pre-hold-out |
+|---|---|---|---|---|---|---|---|
+| **Combinación 50/50, vol 5% (la elegida)** | 0.56 | **0.47 [-1.09, 2.74]** | 0.24 | 2.1% | 4.5% | -5.2% | 0.78 |
+| Componente carry n=2 | 4.10 | 4.07 [1.96, 8.25] | 3.77 | 10.0% | 2.5% | -1.0% | 0.62 |
+| Componente TSMOM 6 meses | -1.06 | -1.20 [-2.92, 0.27] | -1.39 | -6.2% | 5.3% | -9.8% | 0.43 |
+| Equiponderada larga | 1.10 | 1.10 [-0.02, 3.19] | 1.00 | 7.4% | 6.9% | -3.8% | 0.14 |
+| No hacer nada | 0 | 0 | 0 | 0% | 0% | 0% | 0 |
+
+- **La elegida da 0.47 neto**, positivo y consistente con el 0.78 previo. Con 20 meses, el error estándar de un Sharpe anual es ~0.77, así que el hold-out no puede confirmar ni refutar nada. Lo único que descarta es un colapso grande.
+- **El carry de 4.1 en el hold-out se revisó antes de reportarlo**, por la regla de Sharpe mayor que 1.5. En los 20 meses el ranking no cambió: largo en BRL y MXN, corto en JPY y CHF, con ZAR en lugar de MXN solo en el último mes. No saturó (exposición bruta de 0.7 a 1.3). Cada mes ganó 0.3-0.65% de carry devengado (con la Selic en 12-15%) más la apreciación de BRL y MXN sobre JPY y CHF. La vol realizada (2.5%) quedó bajo el objetivo (5%) porque las dos patas se movieron juntas contra el USD, que se debilitó en 2025. Es un año excepcional del carry emergente, no un artefacto: la señal casi no cambió, así que un look-ahead no podría generar ese resultado. Aun así, el IC95 de [2.0, 8.2] refleja 20 meses. **El TSMOM perdió** con las reversiones del dólar de 2025 y anuló buena parte del carry dentro de la combinación.
+- La equiponderada larga ganó 7.4% anual porque el dólar se debilitó. Eso es beta de dólar, no una prima cosechada: antes del hold-out valía 0.14.
+
+**Lectura honesta**:
+
+- Es el primer resultado del proyecto cuyo Sharpe neto supera el máximo esperado por azar entre todas las variantes probadas (0.78 frente a 0.38) con un IC95 que excluye el cero. Además aparece en una estrategia con respaldo académico previo, no descubierta mirando estos datos.
+- También es un resultado modesto. Rinde ~4% anual a 5% de vol, con crashes documentados y correlación positiva con las acciones en la parte de carry. Pierde fuerza en 2017-2024 (0.15), depende en ~40% de BRL, cuyo carry está sobreestimado, y el hold-out de 20 meses no discrimina.
+- No es un producto para operar CLP: CLP es una moneda más del universo y pesa poco.
+- El techo lo ponen las limitaciones de datos: forwards reales en vez de tasas interbancarias, y spreads de forwards NDF medidos en vez de supuestos.
+
+**Pendiente**:
+
+- **Forward points reales**: sobre todo BRL, KRW y CLP en NDF. Harían falta Bloomberg, Refinitiv o los forwards del BCCh para CLP.
+- **Más monedas emergentes**: PLN, CZK, HUF e ILS tienen tasa OECD pero no están en H.10.
+- **El VIX como variable de régimen** que sugería 9.36: no se probó, para no agregar pruebas sin una hipótesis fijada antes.
+- **Sharpe deflactado formal** ([Issue #17](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/17)).
+- **Reevaluar la misma configuración** con más meses de hold-out, sin cambiarla. Es la única forma de ganar poder estadístico sin gastar el hold-out.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), la extensión a ventanas de holding más largas del Issue #11 (`41`-`44`), la extensión a monedas commodity del Issue #12 (`45`-`50`), y la extensión a commodities nuevos y monedas NOK/ZAR/BRL del Issue #13 (`51`-`57`) — ver `README.md` del repositorio para el detalle de cada uno), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
@@ -976,3 +1060,5 @@ Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de 
 Los logs de estas corridas están en `datos/resultados/_log_correccion_*.txt`.
 
 **Issue #14 (9.36)**, desde `codigos/`: `68_features_semanales_mensuales_corregido.py` (sin red), `69_variables_externas_clp.py` (descarga FRED/Yahoo a `datos/bases/issue14_variables_externas.csv`), `70_screening_backtest_variables_clp.py` (necesita la salida de 68) y `71_confirmacion_vix_otras_monedas.py`; cada uno tarda menos de un minuto. Todos anotan sus pruebas en `datos/resultados/registro_pruebas.csv` (`protocolo_evaluacion.py`).
+
+**Issue #15 (9.37)**, desde `codigos/`: `80_datos_cartera_fx_mensual.py` (usa los CSV crudos de `datos/bases/cartera_fx_fuentes/`; `--refrescar` los vuelve a descargar de FRED, Yahoo y mindicador.cl), `81_cartera_fx_seleccion_pre_holdout.py` (~3 min, escribe `issue15_config_elegida.json`) y `82_cartera_fx_holdout.py` (se niega a correr si la apertura del hold-out ya está en el registro). El motor está en `cartera_fx.py`.
