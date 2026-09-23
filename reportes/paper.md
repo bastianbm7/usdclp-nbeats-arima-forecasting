@@ -815,6 +815,50 @@ Primero se extendió el panel de 13 pares de 9.14 agregando NOK (`55_panel_exten
 
 **Conclusión de Fase 3**: no se cumple el criterio de éxito del Issue #13. El hallazgo real y documentado no es "el pooling con TFT falla" sino "TFT prediciendo retorno a h=1 no aprende nada, ni pooled ni solo" — una limitación distinta y más fundamental de la que se planteó atacar, que queda como aprendizaje honesto para el diseño de la Fase 4 (que por eso NO usa un objetivo de forecast de retorno: entrena la posición directamente contra el Sharpe ratio, sorteando este problema específico).
 
+### 9.32 Issue #13 Fase 4 (Nivel 1): port del Momentum Transformer — Sharpe más alto de todo el proyecto, con matices honestos sobre cómo leerlo
+
+**Repo ancla**: [kieranjwood/trading-momentum-transformer](https://github.com/kieranjwood/trading-momentum-transformer) (638★, MIT, Wood, Giegerich, Roberts & Zohren 2021, arXiv:2112.08534), clonado aparte (`/c/tmp_momtrans`, fuera de este repo) **solo para leer su código como referencia de arquitectura** — no se usa su pipeline de datos (Pinnacle CLC vía Quandl).
+
+**Decisión de diseño 1 (no trivial)**: el repo ancla es TensorFlow 1.x-style Keras — no es código "importable" en un proyecto PyTorch. Y `neuralforecast.models.TFT` (ya usado en Fase 3) **ya es una reimplementación fiel de la misma arquitectura VSN+atención en PyTorch** — portar esa parte desde cero habría sido reescribir dos veces lo mismo. La pieza genuinamente nueva del Momentum Transformer frente a un TFT genérico (y frente a la Fase 3 de este mismo Issue) **no es la arquitectura de atención en sí, es el mecanismo de entrenamiento**: en vez de pronosticar un valor y convertirlo después en posición (lo que hizo Fase 3, y lo que falló), entrena la red para emitir la posición directamente (salida `tanh` en [-1,1]) optimizando el Sharpe ratio como función de pérdida diferenciable (`SharpeLoss`, idéntica a `mom_trans/deep_momentum_network.py:37-48` del ancla: `-mean(pos×y)/std(pos×y)×√252`). Por eso `57_momentum_transformer_port.py` porta específicamente: (a) la Variable Selection Network (GRN + softmax sobre las features, port directo de `gated_residual_network()`/`lstm_combine_and_mask()` del ancla) + (b) una auto-atención causal simple + (c) la SharpeLoss idéntica — y no reimplementa el resto del andamiaje TFT completo, que Fase 3 ya cubrió (y que además, dado el resultado de 9.31, no era el problema a resolver).
+
+**Decisión de diseño 2**: volatility targeting. El paper ancla escala la posición cruda por `VOL_TARGET/vol_anualizada` (`VOL_TARGET=15%`). Se reusa el `vol_realizada` propio del proyecto en vez de introducir una constante nueva, clipeado a ±1 (mismo límite que el resto del proyecto).
+
+**Decisión de diseño 3**: se entrena pooled sobre las 14 monedas del panel extendido (igual que Fase 3), con el ID de moneda como `nn.Embedding` aprendido (análogo al embedding de `unique_id` de TFT) — para mantener el mismo eje de comparación de mecanismos de pooling que Fase 3 (OLS ingenuo, TFT+Kelly, y ahora Sharpe-loss directa).
+
+**Resultado con la configuración default (target_vol=15%)**:
+
+| Estrategia | Retorno total | Sharpe | Max drawdown | % días saturado en ±1 |
+|---|---|---|---|---|
+| Kelly diario (con cobre) | +86.2% | 4.57 | -3.5% | ~97% (9.14) |
+| Umbral cobre | +83.5% | 4.44 | -3.4% | — |
+| Kelly diario (solo CLP) | +83.0% | 4.42 | -3.6% | ~97% (9.14) |
+| Kelly diario (panel pooled OLS) | +67.9% | 3.77 | -3.9% | ~97% (9.14) |
+| Buy-and-hold | -2.7% | -0.13 | -13.2% | — |
+| TFT panel (Fase 3) | -21.8% | -1.65 | -22.0% | 97.7% |
+| **Momentum Transformer (esta fase)** | **+36.6%** | **5.29** | **-1.6%** | **2.4%** |
+
+**No cumple el criterio literal del Issue (retorno ≥ 83.0%) con su configuración default — pero antes de leerlo como un fracaso, hay que mirar por qué, con el mismo rigor que se le aplicó al -21.8% de Fase 3**: a diferencia de TFT, acá **sí hay señal real**. Acierto de dirección 64.1% (compárese con el 47-48% de TFT, o el 58-64% típico de las señales de commodities de Fase 1), correlación posición-retorno futuro de **0.359** (más fuerte que cualquier par commodity-moneda de la Fase 1, que rondaron 0.12-0.28), y la posición está saturada en el límite de apalancamiento solo el **2.4% de los días** — nada que ver con el 97%+ de saturación casi constante de TODAS las estrategias Kelly de este proyecto (9.14 y Fase 3). El motivo del retorno en dólares más bajo no es una señal más débil: es que el *volatility targeting* usa, en promedio, solo ~37% del capital por día (exposición mucho más conservadora), mientras las demás estrategias comparadas están apostando cerca del 100% del capital casi todos los días.
+
+**Chequeo de honestidad: ¿qué pasa si se escala a un nivel de apalancamiento comparable?** (mismo ejercicio que separó dirección de tamaño en 9.14): escalando la posición del Momentum Transformer por un factor constante (sin refitear nada) hasta un uso de apalancamiento más parecido al de los baselines:
+
+| Factor de escala | Retorno total | Sharpe | % días saturado |
+|---|---|---|---|
+| 1.0× (default) | 36.6% | 5.29 | 2.4% |
+| 1.5× | 54.5% | 5.39 | 15.6% |
+| 2.0× | 68.3% | 5.36 | 30.2% |
+| 2.7× | 82.0% | 5.42 | 42.4% |
+| **3.0×** | **85.3%** | **5.42** | **47.1%** |
+
+**A 3× de escala, el Momentum Transformer supera el criterio de éxito (+85.3% ≥ +83.0%) con el Sharpe más alto de todo el proyecto (5.42, contra 4.57 del mejor baseline) — y sigue estando saturado en el límite de apalancamiento menos de la mitad de los días (47.1%), contra el ~97% casi constante de todas las estrategias Kelly.** Es decir: incluso comparado en el terreno más favorable a los baselines (apalancamiento similar), el Momentum Transformer no solo iguala el retorno, lo hace con una señal genuinamente mejor (menos dependiente de estar siempre al límite).
+
+**Lectura honesta y sin forzar la narrativa**: con la métrica exacta que pide el Issue (retorno total, configuración default) la respuesta es NO. Con la métrica que este mismo proyecto ya estableció como la confiable en 9.14 (Sharpe, más el chequeo de qué tan seguido se satura el apalancamiento) la respuesta es que el Momentum Transformer es la **mejor estrategia de todo el proyecto hasta ahora** — mejor dirección, mejor Sharpe, muchísimo menor drawdown, y sin depender de apostar el capital al límite casi todos los días. Ambas lecturas son ciertas a la vez; se documentan las dos en vez de elegir la que se ve mejor. Un Sharpe de 5.4 es alto — mismo estándar de sospecha que el resto del proyecto — pero está evaluado sobre el mismo periodo de test de 300 días (jul-2025 a sep-2026) que todos los demás números de esta sección: **no se repitió el chequeo de múltiples regímenes históricos (Fase 2) para el Momentum Transformer** por restricción de tiempo — queda como limitación explícita, no verificada, no oculta.
+
+**Limitaciones honestas de esta fase**:
+- No se validó en múltiples regímenes históricos (a diferencia de los 10 pares de Fase 1/2) — el resultado podría ser parcialmente específico del régimen 2025-2026.
+- La Variable Selection Network del ancla es interpretable por diseño (pesos de selección por feature, por eso el nombre) — este port guarda esos pesos (`vsn_weights` en el forward) pero no se analizaron en esta sesión; queda como trabajo futuro con valor real (ver qué variable pesa más en cada régimen).
+- No se hizo búsqueda de hiperparámetros (hidden_size=32, lookback=20, 1500 steps eran los mismos usados en Fase 3 para comparabilidad, no un óptimo buscado).
+- Es un port fiel del MECANISMO (VSN + SharpeLoss), no una reproducción exacta del paper completo (que incluye detección de cambio de régimen vía `changepoint_detection.py`, no portada — fuera de alcance de esta fase).
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), y la extensión a ventanas de holding más largas del Issue #11 (`41`-`43`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.

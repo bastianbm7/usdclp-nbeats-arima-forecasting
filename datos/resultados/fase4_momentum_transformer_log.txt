@@ -1,0 +1,51 @@
+Panel: 60561 filas, 14 monedas. Momentum Transformer Lite: LOOKBACK=20, hidden=32, steps/ventana=1500, batch=256
+
+--- Ventana 1/5: test 2025-07-17 a 2025-10-08 ---
+    step 500/1500, loss (Sharpe negativo) = -4.7318
+    step 1000/1500, loss (Sharpe negativo) = -4.0934
+    step 1500/1500, loss (Sharpe negativo) = -5.9918
+  Entrenado y evaluado en 43s
+  Capital al cierre de la ventana 1: $104.04
+
+--- Ventana 2/5: test 2025-10-09 a 2026-01-02 ---
+    step 500/1500, loss (Sharpe negativo) = -3.1342
+    step 1000/1500, loss (Sharpe negativo) = -3.9598
+    step 1500/1500, loss (Sharpe negativo) = -3.8060
+  Entrenado y evaluado en 44s
+  Capital al cierre de la ventana 2: $107.61
+
+--- Ventana 3/5: test 2026-01-05 a 2026-03-27 ---
+    step 500/1500, loss (Sharpe negativo) = -3.1540
+    step 1000/1500, loss (Sharpe negativo) = -4.4044
+    step 1500/1500, loss (Sharpe negativo) = -3.2296
+  Entrenado y evaluado en 46s
+  Capital al cierre de la ventana 3: $119.09
+
+--- Ventana 4/5: test 2026-03-30 a 2026-06-19 ---
+    step 500/1500, loss (Sharpe negativo) = -4.3092
+    step 1000/1500, loss (Sharpe negativo) = -5.3686
+    step 1500/1500, loss (Sharpe negativo) = -5.0794
+  Entrenado y evaluado en 47s
+  Capital al cierre de la ventana 4: $125.75
+
+--- Ventana 5/5: test 2026-06-22 a 2026-09-11 ---
+    step 500/1500, loss (Sharpe negativo) = -4.4269
+    step 1000/1500, loss (Sharpe negativo) = -2.7574
+    step 1500/1500, loss (Sharpe negativo) = -5.1868
+  Entrenado y evaluado en 48s
+  Capital al cierre de la ventana 5: $136.64
+
+Tiempo total: 3.8 min
+
+=== Momentum Transformer Lite vs. TFT panel (Fase 3) vs. baselines de 9.14 ===
+                                                       estrategia  capital_final  retorno_total_%  sharpe_anualizado  max_drawdown_%  win_rate_%  operaciones
+Momentum Transformer Lite (panel 14 monedas, Sharpe-loss directa)     136.644221        36.644221           5.289094       -1.629013   61.016949          295
+                                         Kelly diario (con cobre)     186.209127        86.209127           4.567361       -3.516970   60.666667          300
+                                                     Umbral cobre     183.502933        83.502933           4.443581       -3.445413   60.000000          290
+                                          Kelly diario (solo CLP)     183.042238        83.042238           4.416792       -3.594464   60.666667          300
+                            Kelly diario (panel pooled, 13 pares)     167.861275        67.861275           3.765496       -3.909968   60.666667          300
+                                         Kelly diario (sin cobre)     106.029270         6.029270           0.468405       -9.667119   49.333333          300
+                                                     Buy-and-hold      97.292179        -2.707821          -0.128260      -13.150199   49.333333          300
+              TFT panel (14 monedas, ID como covariable estatica)      78.224144       -21.775854          -1.650455      -21.977919   45.333333          300
+
+Criterio de exito (Issue #13): retorno Momentum Transformer (36.6%) >= solo-CLP (83.0%)? NO
