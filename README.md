@@ -138,6 +138,8 @@ La conclusión de toda la extensión de RL vuelve a ser la que ya daba la línea
 
 **[Issue #12](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/12) (AUD, CAD, NZD)** y **[Issue #13](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/13) (WTI, oro, platino, soja, hierro × NOK/ZAR/BRL; TFT; Momentum Transformer)**: la "generalización" a otras monedas y commodities era la de la correlación contemporánea. Corregido: correlación operable ≈ 0 en todas; el SPA de Hansen sobre el universo de 90 estrategias operables no rechaza que ninguna le gane a no operar ni siquiera sin costos; con selección solo con datos previos a cada régimen no se elige casi nada y lo elegido no funciona; TFT (con el bug de alineación del forecast corregido y el control solo-CLP agregado) y Momentum Transformer no tienen señal neta de costos. La Fase 0 de liquidez (incluido el hallazgo del WTI negativo genuino del 2020-04-20) no depende de la errata y sigue válida. 📄 **[Secciones 9.28-9.35 del paper](reportes/paper.md)**.
 
+**[Issue #14](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/14) — variables nuevas a frecuencia semanal/mensual, después de la errata.** Las variables del propio precio de USD/CLP no dependían del error de timestamp. El cobre semanal sí: re-verificado, pasa de -0.10 a +0.04. Se probaron 18 variables nuevas (VIX, S&P 500, emergentes, acciones chilenas, petróleo, dólar global, bono a 2 años, carry), cada una con la hora real de publicación de su dato, reservando 2025-2026 como hold-out intocable y registrando todas las pruebas. **Ninguna sobrevive la corrección por pruebas múltiples**, y el hold-out no se abrió. La única pista es el nivel del VIX: después de semanas de estrés, las monedas de riesgo tienden a recuperarse (USD/CLP semanal, Sharpe neto 0.66 [0.11, 1.20] con carry y costos). Con una regla fija en otras 11 monedas, la dirección se repite en 8 de 9 monedas de riesgo y es ≈0 en los refugios, pero ningún IC95 excluye el cero. Es una pista débil de cartera, no un bot de CLP. 📄 **[Sección 9.36 del paper](reportes/paper.md)**.
+
 ## Datos
 
 Tipo de cambio USD/CLP, serie diaria descargada con [`yfinance`](https://github.com/ranaroussi/yfinance) (ticker `CLP=X`, fuente: Yahoo Finance). Se guarda una copia cruda en `datos/bases/` para reproducibilidad exacta (no depender de que Yahoo siga sirviendo el mismo histórico).
@@ -217,7 +219,14 @@ codigos/
 ├── 64_entrenar_ppo_diario_corregido.py  # reentrena los PPO diarios (9.17, 9.20, 9.23, 9.24/9.26 subconjunto, 9.28) con datos alineados, costos corregidos y 3 semillas - lotes A/B/C/D
 ├── 65_resumen_rl_diario_corregido.py  # metricas de 64 + baselines (umbral cobre con signo de train, umbral simple con mediana de train, buy-and-hold), IC95, sensibilidad a spread
 ├── 66_tft_panel_corregido.py     # rehace 9.33: TFT con el forecast realineado (bug de 56) sobre el panel alineado + control solo-CLP en las 5 ventanas
-└── 67_momentum_transformer_corregido.py  # rehace 9.34: mismo port de 57 sobre el panel alineado, costos, 5 semillas, sin el argumento de escalado 3x
+├── 67_momentum_transformer_corregido.py  # rehace 9.34: mismo port de 57 sobre el panel alineado, costos, 5 semillas, sin el argumento de escalado 3x
+│
+│   # --- DESPUES DE LA ERRATA: protocolo comun + variables nuevas (Issues #14, #17) ---
+├── protocolo_evaluacion.py       # hold-out intocable desde 2025-01-01 + registro de todas las pruebas (datos/resultados/registro_pruebas.csv)
+├── 68_features_semanales_mensuales_corregido.py  # re-verifica cobre/tasas semanales y mensuales (19/21) con la alineacion estricta
+├── 69_variables_externas_clp.py  # descarga VIX, S&P 500, EEM, ECH, WTI, DXY amplio, bono 2 anos, tasas 3m, con la hora real de publicacion de cada dato
+├── 70_screening_backtest_variables_clp.py  # screening FDR (24 pruebas, sin hold-out) + backtest walk-forward con carry y costos de cada variable
+└── 71_confirmacion_vix_otras_monedas.py  # confirma la pista del VIX con una regla fija en 11 monedas que no formularon la hipotesis
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP

@@ -1,0 +1,58 @@
+fecha_registro,issue,script,prueba,frecuencia,metrica,valor,n,usa_holdout,nota
+2026-09-23 15:31,#14,68_features_semanales_mensuales_corregido.py,cobre_ret_1 (reverificacion),semanal,correlacion,0.0412430105870038,868,True,re-verificacion con alineacion corregida; original -0.100
+2026-09-23 15:31,#14,68_features_semanales_mensuales_corregido.py,cobre_mom_4 (reverificacion),semanal,correlacion,0.0164165348536947,865,True,re-verificacion con alineacion corregida; original -0.055
+2026-09-23 15:31,#14,68_features_semanales_mensuales_corregido.py,rate_diff (reverificacion),semanal,correlacion,0.009113089865749,869,True,re-verificacion con alineacion corregida; original 0.007
+2026-09-23 15:31,#14,68_features_semanales_mensuales_corregido.py,cobre_ret_1 (reverificacion),mensual,correlacion,0.0903876336874959,198,True,re-verificacion con alineacion corregida; original 0.100
+2026-09-23 15:31,#14,68_features_semanales_mensuales_corregido.py,cobre_mom_3 (reverificacion),mensual,correlacion,0.0249591444040739,196,True,re-verificacion con alineacion corregida; original 0.003
+2026-09-23 15:31,#14,68_features_semanales_mensuales_corregido.py,rate_diff (reverificacion),mensual,correlacion,0.0112360090484468,199,True,re-verificacion con alineacion corregida; original 0.017
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr vix_log,semanal,correlacion_pre_holdout,-0.0763086304152016,782,False,q_fdr=0.394; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr vix_cambio_1,semanal,correlacion_pre_holdout,-0.0059675458878367,781,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr spx_ret_1,semanal,correlacion_pre_holdout,0.028463018749018,781,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr eem_ret_1,semanal,correlacion_pre_holdout,-0.018473061604196,781,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr ech_ret_1,semanal,correlacion_pre_holdout,0.0167265569944148,781,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr wti_ret_1,semanal,correlacion_pre_holdout,0.0046989107014921,781,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr dxy_mom_4,semanal,correlacion_pre_holdout,0.0142641309441788,778,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr ust2y_cambio_1,semanal,correlacion_pre_holdout,0.0641792431931685,781,False,q_fdr=0.438; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr carry_cl_us_3m,semanal,correlacion_pre_holdout,0.0037698868917882,782,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr vix_log,mensual,correlacion_pre_holdout,-0.1626846332700006,180,False,q_fdr=0.394; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr vix_cambio_1,mensual,correlacion_pre_holdout,-0.0340815549462705,179,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr spx_ret_1,mensual,correlacion_pre_holdout,0.1110296213838727,179,False,q_fdr=0.590; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr eem_ret_1,mensual,correlacion_pre_holdout,0.0442804459790341,179,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr ech_ret_1,mensual,correlacion_pre_holdout,0.1349375293104469,179,False,q_fdr=0.438; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr wti_ret_1,mensual,correlacion_pre_holdout,0.0214368820052555,179,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr dxy_mom_3,mensual,correlacion_pre_holdout,-0.0257933449918089,177,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr ust2y_cambio_1,mensual,correlacion_pre_holdout,0.0035166932203882,179,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,corr carry_cl_us_3m,mensual,correlacion_pre_holdout,0.0044798424638081,180,False,q_fdr=0.963; sobrevive=False
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest vix_log,semanal,sharpe_neto_rotacion_pre_holdout,0.6557696413493302,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest vix_cambio_1,semanal,sharpe_neto_rotacion_pre_holdout,-0.2573327592048037,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest spx_ret_1,semanal,sharpe_neto_rotacion_pre_holdout,-0.3232525590639337,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest eem_ret_1,semanal,sharpe_neto_rotacion_pre_holdout,-0.4545167689520237,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest ech_ret_1,semanal,sharpe_neto_rotacion_pre_holdout,-0.184119612414622,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest wti_ret_1,semanal,sharpe_neto_rotacion_pre_holdout,-0.5266413970970459,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest dxy_mom_4,semanal,sharpe_neto_rotacion_pre_holdout,-0.4271401018258957,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest ust2y_cambio_1,semanal,sharpe_neto_rotacion_pre_holdout,-0.1343532589086149,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest carry_cl_us_3m,semanal,sharpe_neto_rotacion_pre_holdout,-0.1138325566325679,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest largo USD/CLP permanente,semanal,sharpe_neto_rotacion_pre_holdout,0.2521480749231817,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest corto USD/CLP permanente (largo CLP + carry),semanal,sharpe_neto_rotacion_pre_holdout,-0.2532459912532055,522,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest vix_log,mensual,sharpe_neto_rotacion_pre_holdout,0.4583324407130932,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest vix_cambio_1,mensual,sharpe_neto_rotacion_pre_holdout,-0.1801959237796502,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest spx_ret_1,mensual,sharpe_neto_rotacion_pre_holdout,0.4450602018498112,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest eem_ret_1,mensual,sharpe_neto_rotacion_pre_holdout,0.011798487976761,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest ech_ret_1,mensual,sharpe_neto_rotacion_pre_holdout,0.3378863635836999,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest wti_ret_1,mensual,sharpe_neto_rotacion_pre_holdout,-0.2467048260399958,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest dxy_mom_3,mensual,sharpe_neto_rotacion_pre_holdout,-0.2484207988094545,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest ust2y_cambio_1,mensual,sharpe_neto_rotacion_pre_holdout,-0.2299042166429196,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest carry_cl_us_3m,mensual,sharpe_neto_rotacion_pre_holdout,-0.0275236548038546,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest largo USD/CLP permanente,mensual,sharpe_neto_rotacion_pre_holdout,0.2126239551935474,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,70_screening_backtest_variables_clp.py,backtest corto USD/CLP permanente (largo CLP + carry),mensual,sharpe_neto_rotacion_pre_holdout,-0.2137807649290147,120,False,"walk-forward anual, carry incluido"
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log BRL=X,semanal,sharpe_neto_rotacion_pre_holdout,0.14406693593814765,522,False,EM (principal)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log MXN=X,semanal,sharpe_neto_rotacion_pre_holdout,0.34560066720816124,522,False,EM (principal)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log COP=X,semanal,sharpe_neto_rotacion_pre_holdout,0.07808308687197177,522,False,EM (principal)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log ZAR=X,semanal,sharpe_neto_rotacion_pre_holdout,0.13457146362366654,522,False,EM (principal)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log PEN=X,semanal,sharpe_neto_rotacion_pre_holdout,-0.10977125277585731,522,False,EM (principal)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log AUDUSD=X,semanal,sharpe_neto_rotacion_pre_holdout,0.44151604270104294,522,False,G10 riesgo (secundario)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log NZDUSD=X,semanal,sharpe_neto_rotacion_pre_holdout,0.45381116847328085,522,False,G10 riesgo (secundario)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log CAD=X,semanal,sharpe_neto_rotacion_pre_holdout,0.22380503012553063,522,False,G10 riesgo (secundario)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log USDNOK=X,semanal,sharpe_neto_rotacion_pre_holdout,0.12171471024786659,522,False,G10 riesgo (secundario)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log JPY=X,semanal,sharpe_neto_rotacion_pre_holdout,0.004465380001147179,522,False,refugio (control)
+2026-09-23 15:36,#14,71_confirmacion_vix_otras_monedas.py,confirmacion vix_log CHF=X,semanal,sharpe_neto_rotacion_pre_holdout,0.12414014001750688,522,False,refugio (control)
