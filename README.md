@@ -177,7 +177,8 @@ codigos/
 ├── 40_backtest_walkforward_diario_grilla_nh.py  # Issue #10: grilla TP fijo por horizonte (h1-h5) x holding (N=3,5,7), 15 combinaciones
 ├── 41_graficos_grilla_nh_h4.py            # graficos de retorno en el tiempo y entrada/salida, h4 fijo comparando N
 ├── 42_backtest_walkforward_diario_grilla_nh_largo.py  # Issue #11: extiende la grilla a N=10,12,14,20 (mismo dataset/entorno del Issue #10)
-└── 43_graficos_resumen_grilla_nh_extendida.py  # Issue #11: Sharpe/drawdown/%stop-loss promedio por N, grilla completa (N=3 a 20)
+├── 43_graficos_resumen_grilla_nh_extendida.py  # Issue #11: Sharpe/drawdown/%stop-loss promedio por N, grilla completa (N=3 a 20)
+└── 51_verificar_liquidez_commodities_nok.py  # Issue #13 Fase 0: liquidez de WTI/oro/platino/soja/hierro/NOK vs. umbral de litio, re-verifica ticks de BRL/ZAR
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
@@ -186,6 +187,8 @@ datos/
 reportes/
 └── paper.md      # informe de investigación completo (resumen, metodología, resultados, discusión)
 ```
+
+Nota de numeración: los scripts `45`-`50` corresponden a otra rama de trabajo en paralelo (Issue #12, AUD/CAD/NZD diario) y no existen en esta rama (`commodities-nok-zar-brl`) — la numeración de Issue #13 arranca en `51` a propósito para no chocar al fusionar.
 
 ## Limitaciones conocidas
 

@@ -1,0 +1,7 @@
+ticker,nombre,n_obs_12m,meses_evaluados,puntos_por_mes_promedio,puntos_por_mes_minimo,sobrevive_fase0
+USDNOK=X,USD/NOK,276,11,21.5,20,True
+CL=F,WTI (petroleo),267,11,20.9,19,True
+GC=F,Oro,267,11,20.9,19,True
+PL=F,Platino,267,11,20.9,19,True
+ZS=F,Soja,267,11,20.9,19,True
+TIO=F,Hierro,266,11,20.9,19,True

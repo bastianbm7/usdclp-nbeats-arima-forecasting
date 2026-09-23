@@ -699,6 +699,29 @@ Bastián observó en 9.24 que N=7 tenía el mejor perfil de riesgo de la grilla 
 - [ ] Decidir si vale la pena correr otro periodo de test (no solo el tramo final del dataset) para separar señal real de ruido de muestra chica en N=10 a N=20, antes de usar este patrón para una decisión de diseño.
 - [x] Cerrar la Tarea de Notion "Extender la grilla N x h del Issue #10..." con este hallazgo documentado.
 
+### 9.28 Issue #13: commodities nuevos (petróleo, oro, platino, soja, hierro) + NOK/ZAR/BRL — Fase 0, verificación de liquidez
+
+[Issue #13](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/13) extiende la línea de 9.13-9.14 (el efecto `copper_ret_1d`) a otros commodities y monedas commodity nuevas: WTI (`CL=F`), oro (`GC=F`), platino (`PL=F`), soja (`ZS=F`), hierro (`TIO=F`) y NOK (`USDNOK=X`) — más BRL y ZAR, que ya estaban en el panel de 13 pares de 9.14 pero nunca se habían cruzado contra un commodity propio (solo contra cobre). Antes de gastar cómputo en screening o backtest, Fase 0 (`51_verificar_liquidez_commodities_nok.py`) verifica que estos tickers de yfinance sean de verdad líquidos — mismo criterio que ya descartó litio (`LTH=F`) en investigación previa por tener ~1 dato/mes en vez de los ~21 días hábiles esperados.
+
+**Resultado: los 6 candidatos sobreviven Fase 0 sin excepción**, todos con ~21 puntos/mes (rango 19.0-21.5), indistinguible de un future/par FX líquido normal:
+
+| Ticker | Nombre | Puntos/mes promedio (12m) | Mínimo mensual | Sobrevive |
+|---|---|---|---|---|
+| USDNOK=X | USD/NOK | 21.5 | 20 | Sí |
+| CL=F | WTI | 20.9 | 19 | Sí |
+| GC=F | Oro | 20.9 | 19 | Sí |
+| PL=F | Platino | 20.9 | 19 | Sí |
+| ZS=F | Soja | 20.9 | 19 | Sí |
+| TIO=F | Hierro | 20.9 | 19 | Sí |
+
+![Liquidez de commodities/NOK candidatos](../datos/resultados/fase0_liquidez_commodities_nok.png)
+
+También se re-verificó BRL=X y ZAR=X (ya en `datos/bases/panel_fx_diario.csv` desde 9.14, ya limpiados ahí con `limpiar_ticks_erroneos`) por si quedó algún tick corrupto residual: 0 en ambos, sobre 4.325 observaciones cada uno.
+
+**Hallazgo real encontrado al aplicar la limpieza de ticks a commodities (no a FX)**: `limpiar_ticks_erroneos()` (`01_obtener_datos.py`) marcó el **2020-04-20 de WTI (`CL=F`) como "tick corrupto"** y estaba a punto de interpolarlo — el valor de yfinance para ese día es **-37.63**. Antes de aceptar la corrección se verificó el dato crudo directamente: no es un error de yfinance, es el **colapso real e histórico del WTI a precio negativo** durante la crisis de almacenamiento de la pandemia (documentado públicamente, único evento de precio negativo en la historia del petróleo). La función original asume implícitamente que un precio nunca es negativo — cierto para todos los pares FX del proyecto hasta ahora, falso para petróleo. Se corrigió con una guarda adicional (`y > 0`) en una versión local de la función (`limpiar_ticks_erroneos_commodity`, en `51_verificar_liquidez_commodities_nok.py`) que preserva exactamente el mismo comportamiento para FX (el bug de ticks corruptos de yfinance siempre produce un valor chico pero *positivo*, nunca negativo) sin borrar un evento de mercado genuino. Se documenta como el tipo de "número sospechoso" que este proyecto verifica antes de aceptar, no después.
+
+Con Fase 0 completa, las Fases 1-3 de Issue #13 usan los 6 candidatos sin descartar ninguno — a diferencia de litio, ningún ticker resultó demasiado ilíquido para justificar el filtro.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), y la extensión a ventanas de holding más largas del Issue #11 (`41`-`43`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
