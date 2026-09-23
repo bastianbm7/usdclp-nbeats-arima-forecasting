@@ -1110,6 +1110,21 @@ La protección que sí funciona ya está incluida: la volatilidad objetivo, que 
 - **La (a) es la mejor de todo el Issue** (0.91), y mejora en los tres subperíodos, incluido el último (0.40 vs. 0.15).
 - **Este número está sobreestimado por construcción**: sus dos ingredientes se eligieron mirando 2000-2024, y se evalúan en ese mismo período. La diferencia con la original (+0.13) es menor que el error del Sharpe (±0.4). Es el candidato más prometedor para confirmar fuera de muestra, no un resultado confirmado.
 
+**Hold-out de la estrategia (a): apertura única** (`87_cartera_fx_holdout_estrategia_a.py`, configuración congelada en el commit `f6f53f4`). No es una apertura del todo ciega: el hold-out ya se había abierto en 82 para la original.
+
+| Neto | Original: Sharpe / retorno anual / caída máx. | Estrategia (a): Sharpe / retorno anual / caída máx. |
+|---|---|---|
+| 2015-2024 (usado para elegir) | 0.24 / 1.2% / -9.7% | 0.47 / 2.5% / -10.3% |
+| **2025-01 a 2026-08 (hold-out, 20 meses)** | **0.47 / 2.0% / -5.2%** | **-0.18 / -0.9% / -5.8%** |
+| 2015-2026 completo | 0.27 / 1.3% / -12.0% | 0.39 / 2.0% / -12.5% |
+
+**La estrategia (a) no se confirma**: en el hold-out queda por debajo de la original (-0.18 vs. 0.47). Descomposición de la misma apertura:
+
+- El carry fue excelente en ese período (Sharpe 4.07, +18.0%); el trailing en la pata larga cerró 2 posiciones y le quitó parte (+16.0%).
+- El momentum fue malo (-10.0%), y **solo en la mitad menos volátil fue peor** (-16.6%): la vuelta del dólar en 2025 cortó las tendencias justo en las monedas G10.
+
+Con 20 meses el IC95 es enorme ([-1.31, 2.00]), así que esto tampoco prueba que (a) sea peor. Sí muestra que la mejora de 0.78 → 0.91 era, al menos en parte, ajuste al período en que se encontró. Se mantiene la original como configuración oficial.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), la extensión a ventanas de holding más largas del Issue #11 (`41`-`44`), la extensión a monedas commodity del Issue #12 (`45`-`50`), y la extensión a commodities nuevos y monedas NOK/ZAR/BRL del Issue #13 (`51`-`57`) — ver `README.md` del repositorio para el detalle de cada uno), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
