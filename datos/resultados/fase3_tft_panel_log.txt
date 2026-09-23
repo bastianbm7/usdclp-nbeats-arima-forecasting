@@ -1,0 +1,184 @@
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+
+   | Name                    | Type                     | Params | Mode 
+------------------------------------------------------------------------------
+0  | loss                    | MAE                      | 0      | train
+1  | hist_cat_embeddings     | ModuleList               | 0      | train
+2  | futr_cat_embeddings     | ModuleList               | 0      | train
+3  | stat_cat_embeddings     | ModuleList               | 0      | train
+4  | padder_train            | ConstantPad1d            | 0      | train
+5  | scaler                  | TemporalNorm             | 0      | train
+6  | embedding               | TFTEmbedding             | 2.0 K  | train
+7  | static_encoder          | StaticCovariateEncoder   | 381 K  | train
+8  | temporal_encoder        | TemporalCovariateEncoder | 1.0 M  | train
+9  | temporal_fusion_decoder | TemporalFusionDecoder    | 256 K  | train
+10 | output_adapter          | Linear                   | 129    | train
+------------------------------------------------------------------------------
+1.7 M     Trainable params
+0         Non-trainable params
+1.7 M     Total params
+6.694     Total estimated model params size (MB)
+185       Modules in train mode
+0         Modules in eval mode
+E:\venvs\usdclp-nbeats-arima-forecasting\.venv\Lib\site-packages\pytorch_lightning\utilities\_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+
+   | Name                    | Type                     | Params | Mode 
+------------------------------------------------------------------------------
+0  | loss                    | MAE                      | 0      | train
+1  | hist_cat_embeddings     | ModuleList               | 0      | train
+2  | futr_cat_embeddings     | ModuleList               | 0      | train
+3  | stat_cat_embeddings     | ModuleList               | 0      | train
+4  | padder_train            | ConstantPad1d            | 0      | train
+5  | scaler                  | TemporalNorm             | 0      | train
+6  | embedding               | TFTEmbedding             | 2.0 K  | train
+7  | static_encoder          | StaticCovariateEncoder   | 381 K  | train
+8  | temporal_encoder        | TemporalCovariateEncoder | 1.0 M  | train
+9  | temporal_fusion_decoder | TemporalFusionDecoder    | 256 K  | train
+10 | output_adapter          | Linear                   | 129    | train
+------------------------------------------------------------------------------
+1.7 M     Trainable params
+0         Non-trainable params
+1.7 M     Total params
+6.694     Total estimated model params size (MB)
+185       Modules in train mode
+0         Modules in eval mode
+E:\venvs\usdclp-nbeats-arima-forecasting\.venv\Lib\site-packages\pytorch_lightning\utilities\_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+
+   | Name                    | Type                     | Params | Mode 
+------------------------------------------------------------------------------
+0  | loss                    | MAE                      | 0      | train
+1  | hist_cat_embeddings     | ModuleList               | 0      | train
+2  | futr_cat_embeddings     | ModuleList               | 0      | train
+3  | stat_cat_embeddings     | ModuleList               | 0      | train
+4  | padder_train            | ConstantPad1d            | 0      | train
+5  | scaler                  | TemporalNorm             | 0      | train
+6  | embedding               | TFTEmbedding             | 2.0 K  | train
+7  | static_encoder          | StaticCovariateEncoder   | 381 K  | train
+8  | temporal_encoder        | TemporalCovariateEncoder | 1.0 M  | train
+9  | temporal_fusion_decoder | TemporalFusionDecoder    | 256 K  | train
+10 | output_adapter          | Linear                   | 129    | train
+------------------------------------------------------------------------------
+1.7 M     Trainable params
+0         Non-trainable params
+1.7 M     Total params
+6.694     Total estimated model params size (MB)
+185       Modules in train mode
+0         Modules in eval mode
+E:\venvs\usdclp-nbeats-arima-forecasting\.venv\Lib\site-packages\pytorch_lightning\utilities\_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+
+   | Name                    | Type                     | Params | Mode 
+------------------------------------------------------------------------------
+0  | loss                    | MAE                      | 0      | train
+1  | hist_cat_embeddings     | ModuleList               | 0      | train
+2  | futr_cat_embeddings     | ModuleList               | 0      | train
+3  | stat_cat_embeddings     | ModuleList               | 0      | train
+4  | padder_train            | ConstantPad1d            | 0      | train
+5  | scaler                  | TemporalNorm             | 0      | train
+6  | embedding               | TFTEmbedding             | 2.0 K  | train
+7  | static_encoder          | StaticCovariateEncoder   | 381 K  | train
+8  | temporal_encoder        | TemporalCovariateEncoder | 1.0 M  | train
+9  | temporal_fusion_decoder | TemporalFusionDecoder    | 256 K  | train
+10 | output_adapter          | Linear                   | 129    | train
+------------------------------------------------------------------------------
+1.7 M     Trainable params
+0         Non-trainable params
+1.7 M     Total params
+6.694     Total estimated model params size (MB)
+185       Modules in train mode
+0         Modules in eval mode
+E:\venvs\usdclp-nbeats-arima-forecasting\.venv\Lib\site-packages\pytorch_lightning\utilities\_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+
+   | Name                    | Type                     | Params | Mode 
+------------------------------------------------------------------------------
+0  | loss                    | MAE                      | 0      | train
+1  | hist_cat_embeddings     | ModuleList               | 0      | train
+2  | futr_cat_embeddings     | ModuleList               | 0      | train
+3  | stat_cat_embeddings     | ModuleList               | 0      | train
+4  | padder_train            | ConstantPad1d            | 0      | train
+5  | scaler                  | TemporalNorm             | 0      | train
+6  | embedding               | TFTEmbedding             | 2.0 K  | train
+7  | static_encoder          | StaticCovariateEncoder   | 381 K  | train
+8  | temporal_encoder        | TemporalCovariateEncoder | 1.0 M  | train
+9  | temporal_fusion_decoder | TemporalFusionDecoder    | 256 K  | train
+10 | output_adapter          | Linear                   | 129    | train
+------------------------------------------------------------------------------
+1.7 M     Trainable params
+0         Non-trainable params
+1.7 M     Total params
+6.694     Total estimated model params size (MB)
+185       Modules in train mode
+0         Modules in eval mode
+E:\venvs\usdclp-nbeats-arima-forecasting\.venv\Lib\site-packages\pytorch_lightning\utilities\_pytree.py:21: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+Panel extendido: 60561 filas, 14 pares (incluye NOK). CLP: 4326 obs.
+Walk-forward: 5 ventanas x 60 dias, TFT h=1 input_size=20 max_steps=1500, reentrena 1 vez por ventana (no online).
+
+--- Ventana 1/5: test hasta 2025-10-08 (4026 obs de entrenamiento disponibles para CLP antes de este corte) ---
+  TFT entrenado y predicho en 1417s, 60 dias pronosticados
+  Capital al cierre de la ventana 1: $93.21
+
+--- Ventana 2/5: test hasta 2026-01-02 (4086 obs de entrenamiento disponibles para CLP antes de este corte) ---
+  TFT entrenado y predicho en 1401s, 60 dias pronosticados
+  Capital al cierre de la ventana 2: $96.40
+
+--- Ventana 3/5: test hasta 2026-03-27 (4146 obs de entrenamiento disponibles para CLP antes de este corte) ---
+  TFT entrenado y predicho en 1409s, 60 dias pronosticados
+  Capital al cierre de la ventana 3: $89.46
+
+--- Ventana 4/5: test hasta 2026-06-19 (4206 obs de entrenamiento disponibles para CLP antes de este corte) ---
+  TFT entrenado y predicho en 1458s, 60 dias pronosticados
+  Capital al cierre de la ventana 4: $80.66
+
+--- Ventana 5/5: test hasta 2026-09-11 (4266 obs de entrenamiento disponibles para CLP antes de este corte) ---
+  TFT entrenado y predicho en 1408s, 60 dias pronosticados
+  Capital al cierre de la ventana 5: $78.22
+
+Tiempo total: 118.2 min
+
+=== RMSE del forecast de retorno de TFT, por ventana ===
+ ventana fecha_fin_test  rmse_retorno  n_obs
+       1     2025-10-08      0.008427     60
+       2     2026-01-02      0.006362     60
+       3     2026-03-27      0.008489     60
+       4     2026-06-19      0.009643     60
+       5     2026-09-11      0.006251     60
+
+=== TFT panel vs. baselines de 9.14 (solo-CLP +83.0%, pooled OLS ingenuo +67.9%) ===
+                                         estrategia  capital_final  retorno_total_%  sharpe_anualizado  max_drawdown_%  win_rate_%  operaciones
+                           Kelly diario (con cobre)     186.209127        86.209127           4.567361       -3.516970   60.666667          300
+                                       Umbral cobre     183.502933        83.502933           4.443581       -3.445413   60.000000          290
+                            Kelly diario (solo CLP)     183.042238        83.042238           4.416792       -3.594464   60.666667          300
+              Kelly diario (panel pooled, 13 pares)     167.861275        67.861275           3.765496       -3.909968   60.666667          300
+                           Kelly diario (sin cobre)     106.029270         6.029270           0.468405       -9.667119   49.333333          300
+                                       Buy-and-hold      97.292179        -2.707821          -0.128260      -13.150199   49.333333          300
+TFT panel (14 monedas, ID como covariable estatica)      78.224144       -21.775854          -1.650455      -21.977919   45.333333          300
+
+Criterio de exito (Issue #13): retorno TFT panel (-21.8%) >= solo-CLP (83.0%)? NO

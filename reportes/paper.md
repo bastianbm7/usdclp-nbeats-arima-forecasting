@@ -784,6 +784,37 @@ Mismo principio que 9.14 del Issue #5 (validar el Sharpe de cobre-CLP en 2015-20
 
 **Conclusión de Fase 2**: los 10 pares de Fase 1 generalizan razonablemente bien fuera de muestra temporal — no es un artefacto de un solo régimen reciente. `ZAR×Platino`, `NOK×WTI`, `BRL×Platino` son los 3 más consistentes (Sharpe mínimo > 2.3 en cualquier régimen); los pares con oro/platino como commodity son los que más se debilitan en el régimen 2020 específicamente, un patrón económicamente interpretable (refugio vs. exportación), no ruido aleatorio.
 
+### 9.31 Issue #13 Fase 3 (Nivel 0): TFT sobre el panel ampliado (con NOK) — no supera el criterio de éxito, y el diagnóstico muestra por qué
+
+Primero se extendió el panel de 13 pares de 9.14 agregando NOK (`55_panel_extendido_con_nok.py`, `datos/bases/panel_fx_diario_extendido.csv`, 14 monedas, 60.561 filas) con la misma receta de features que las otras 13. Después, `56_tft_panel_walkforward.py` entrena `neuralforecast.models.TFT` (h=1, `input_size=20`, `max_steps=1500` — mismo presupuesto que resolvió el forecast "chato" de N-HiTS en la sección 4.1) sobre el panel completo, con `es_commodity` como covariable estática explícita y el ID de cada moneda como embedding nativo de `unique_id`, para pronosticar el retorno diario de CLP. Igual que 9.14/22/23, el forecast (`mu_pred`) alimenta la misma fórmula de Kelly (`f = mu_pred/σ², clip ±1`) y el mismo walk-forward de 5 ventanas × 60 días, para comparar contra los mismos baselines.
+
+**Resultado crudo: retorno -21.8%, Sharpe -1.65 — peor que TODOS los baselines de 9.14, incluido buy-and-hold (-2.7%).** No cumple el criterio de éxito (igualar o superar +83.0% de solo-CLP).
+
+| Estrategia | Retorno total | Sharpe |
+|---|---|---|
+| Kelly diario (con cobre) | +86.2% | 4.57 |
+| Umbral cobre | +83.5% | 4.44 |
+| Kelly diario (solo CLP) | +83.0% | 4.42 |
+| Kelly diario (panel pooled OLS, 13 pares) | +67.9% | 3.77 |
+| Buy-and-hold | -2.7% | -0.13 |
+| **TFT panel (14 monedas, esta fase)** | **-21.8%** | **-1.65** |
+
+**Antes de aceptar un número tan malo como "el hallazgo", se verificó igual que se verifica uno sospechosamente bueno** (mismo estándar del proyecto desde el bug de apalancamiento de 9.14): la posición estuvo saturada en ±1 (el límite de apalancamiento) el **97.7% de los días** — la misma firma del problema de 9.14. Eso obliga a separar dirección de tamaño antes de creer el número:
+
+1. **Diagnóstico de la señal, no solo del backtest**: el RMSE promedio del forecast de TFT (0.00783) es prácticamente **idéntico** al RMSE de predecir simplemente "cero" todos los días (0.00768, la varianza del propio retorno) — TFT no está aportando información. El acierto de dirección (signo del forecast vs. signo del retorno real, alineado correctamente día a día) es **47.7%**, peor que una moneda al aire, y la correlación forecast-retorno real es **-0.075**. Con una señal así de mala, la saturación de apalancamiento simplemente amplifica el ruido en la dirección equivocada la mitad de las veces — coherente con el Sharpe muy negativo, no un artefacto separado.
+2. **Control aislando pooling vs. arquitectura**: para saber si el problema es el *pooling* (la hipótesis de 9.15 que esta fase debía atacar) o es *TFT en sí* para esta tarea, se entrenó un TFT idéntico usando **solo** la historia de CLP (sin las otras 13 monedas), mismo `h=1`/`input_size`/`max_steps`, sobre la ventana 5 (la de más datos disponibles). Resultado: **RMSE 0.00635 contra 0.00531 de predecir cero (peor todavía, en términos relativos, que la versión pooled)**, acierto de dirección 48.3%, correlación -0.091.
+
+| Configuración | RMSE | RMSE "predecir cero" | Acierto dirección | Correlación |
+|---|---|---|---|---|
+| TFT panel (14 monedas pooled) | 0.00783 | 0.00768 | 47.7% | -0.075 |
+| TFT solo-CLP (control) | 0.00635 | 0.00531 | 48.3% | -0.091 |
+
+**Lectura honesta, y es distinta de lo que se esperaba investigar**: el diagnóstico descarta la hipótesis que motivó esta fase (que el pooling ingenuo específicamente perjudica a CLP) — el TFT solo-CLP es *igual de malo o levemente peor* (en términos relativos al ruido) que el pooled, no mejor. El problema real no es el mecanismo de pooling, es que **TFT pronosticando el retorno diario directamente a h=1 no aprende señal alguna sobre USD/CLP**, entrenado solo o pooled. Es un resultado distinto — y más interesante — que "el pooling con ID como covariable estática arregla 9.14": ni siquiera hace falta que el pooling sea el problema, porque el forecast de retorno a 1 paso ya fracasa antes de llegar a esa pregunta.
+
+**Hipótesis de por qué (no verificada más a fondo, documentada como tal)**: la sección 4.1 de este mismo paper ya mostró que un forecast diario funciona razonablemente con N-HiTS, pero pronosticando el **nivel de precio** a **h=14 pasos** (donde la autocorrelación/persistencia del nivel ayuda mucho) — no el **retorno** a **h=1 paso** (que en una serie eficiente es información casi pura, cercana a ruido blanco por definición). Pedirle a un modelo con 1.7M de parámetros (TFT, con atención + LSTM + variable selection) que aprenda una señal de retorno a 1 día es un objetivo mucho más difícil que el que ya resolvió N-HiTS, y el hallazgo de 22 (`copper_ret_1d` con |r|=0.25) es justamente la clase de señal específica y chica que un modelo general no tiene por qué redescubrir solo con MAE/atención genérica, sin que esa relación esté explícitamente destacada en la arquitectura o la función de pérdida.
+
+**Conclusión de Fase 3**: no se cumple el criterio de éxito del Issue #13. El hallazgo real y documentado no es "el pooling con TFT falla" sino "TFT prediciendo retorno a h=1 no aprende nada, ni pooled ni solo" — una limitación distinta y más fundamental de la que se planteó atacar, que queda como aprendizaje honesto para el diseño de la Fase 4 (que por eso NO usa un objetivo de forecast de retorno: entrena la posición directamente contra el Sharpe ratio, sorteando este problema específico).
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), y la extensión a ventanas de holding más largas del Issue #11 (`41`-`43`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
