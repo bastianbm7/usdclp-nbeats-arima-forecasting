@@ -722,6 +722,36 @@ También se re-verificó BRL=X y ZAR=X (ya en `datos/bases/panel_fx_diario.csv` 
 
 Con Fase 0 completa, las Fases 1-3 de Issue #13 usan los 6 candidatos sin descartar ninguno — a diferencia de litio, ningún ticker resultó demasiado ilíquido para justificar el filtro.
 
+### 9.29 Issue #13 Fase 1: screening de correlación NOK/ZAR/BRL × 5 commodities, con corrección FDR y bootstrap SPA
+
+Mismo método que validó `copper_ret_1d` en 9.14: escaneo de rezagos -2 a +3 (`52_screening_correlacion_commodities_fx.py`) entre el retorno diario de cada commodity y el retorno de cada moneda, sobre **3 monedas × 5 commodities × 6 rezagos = 90 pruebas**. Con ese volumen la corrección Benjamini-Hochberg FDR (`statsmodels.stats.multitest.multipletests`, α=0.05) se aplicó sobre las 90 pruebas juntas antes de mirar ninguna individualmente — la tabla completa (positivos y negativos) está en `datos/resultados/fase1_screening_correlacion_completo.csv`.
+
+![Heatmap de correlación por rezago, 90 pruebas](../datos/resultados/fase1_screening_heatmap.png)
+
+**Resultado: 11 de 90 combinaciones sobreviven FDR y superan el umbral |r|=0.11**, todas concentradas en el rezago +1 (predictivo) salvo una en rezago +2:
+
+| Moneda | Commodity | Rezago | Correlación | p-valor FDR |
+|---|---|---|---|---|
+| NOK | WTI | +1 | **0.275** | 3.7e-74 |
+| ZAR | Platino | +1 | **0.228** | 3.2e-50 |
+| ZAR | Oro | +1 | 0.194 | 2.1e-36 |
+| BRL | Soja | +1 | 0.186 | 9.6e-34 |
+| BRL | Platino | +1 | 0.183 | 9.6e-33 |
+| NOK | Platino | +1 | 0.178 | 3.0e-31 |
+| NOK | Oro | +1 | 0.172 | 3.9e-29 |
+| BRL | WTI | +1 | 0.138 | 8.8e-19 |
+| NOK | WTI | +2 | -0.135 | 3.0e-18 |
+| BRL | Oro | +1 | 0.118 | 5.0e-14 |
+| ZAR | WTI | +1 | 0.118 | 5.1e-14 |
+
+El signo es siempre el esperado económicamente (commodity sube ⇒ la moneda commodity se aprecia frente al USD, con las series ya invertidas a "USD por unidad de moneda") y, igual que en 9.14, el efecto está concentrado casi por completo en el rezago +1 — no en el 0 (contemporáneo) ni en los rezagos negativos (que chequearían si es la moneda la que lidera al commodity) — descartando el mismo mecanismo de contaminación de timestamp que ya se descartó para cobre-CLP. 14 combinaciones adicionales sobreviven FDR pero no superan |r|=0.11 (estadísticamente distintas de cero con n>4.100, pero económicamente chicas — se documentan en el CSV completo, no se descartan silenciosamente).
+
+**Refuerzo con bootstrap SPA de Hansen** (`53_bootstrap_spa_supervivientes.py`, `arch.bootstrap.SPA`, bootstrap estacionario, 5.000 repeticiones): se testearon los 10 supervivientes de rezago +1 (el rezago +2 de NOK-WTI queda como hallazgo secundario no operable con una regla diaria simple, no se lleva al bootstrap) con una estrategia de juguete — posición = signo(r) × signo(retorno del commodity), sin Kelly ni gestión de riesgo, contra un benchmark de "no operar". **El p-valor conjunto de SPA es 0.0 en los tres criterios (lower/consistent/upper)** — se rechaza con margen amplio la hipótesis nula de que ninguna de las 10 estrategias le gana al benchmark, y las 10 se identifican individualmente como mejores que no operar bajo el criterio estándar de Hansen (`consistent`). Sharpe anualizado de esta estrategia de juguete: 1.67 (BRL×Oro) a 3.50 (ZAR×Platino) — en el mismo orden de magnitud que el Sharpe ~4.5 que ya se había encontrado para cobre-CLP en 9.14 con el mismo tipo de señal simple, no un número fuera de escala para este proyecto.
+
+Tabla completa por estrategia (Sharpe, retorno promedio diario, significancia bajo los 3 criterios de Hansen) en `datos/resultados/fase1_bootstrap_spa.csv`.
+
+**Caveat honesto, verificado antes de festejar el resultado — posible factor común, no 10 mecanismos independientes**: que prácticamente todas las combinaciones moneda×commodity den positivo (oro Y platino Y petróleo Y soja, para las 3 monedas) es distinto al patrón de cobre-CLP (una relación específica, ancorada en Chen & Rogoff). Se verificó la correlación cruzada de los 5 commodities entre sí: oro-platino correlaciona 0.60 (ambos metales preciosos, plausible que compartan un factor macro común — tasas reales, apetito de riesgo), mientras que el resto de los pares está en 0.02-0.21 — no hay un único factor dominante que explique las 90 pruebas, pero el par oro-platino sí comparte varianza real, así que los hallazgos de ZAR/NOK/BRL × oro y × platino no deben leerse como 6 señales completamente independientes. Dicho esto, la correlación **más fuerte de cada moneda coincide con su exportación de materia prima dominante** (NOK-petróleo 0.275, el mayor de todos — Noruega es exportador neto de petróleo; ZAR-platino 0.228 — Sudáfrica es el mayor productor mundial de platino; BRL-soja 0.186 — Brasil es el mayor exportador mundial de soja), la misma lectura de "generalización que confirma la teoría" que dio el panel de 13 pares en 9.14. La Fase 2 (walk-forward en múltiples regímenes históricos) es el chequeo real de si esto sobrevive fuera de un screening in-sample sobre toda la historia.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), y la extensión a ventanas de holding más largas del Issue #11 (`41`-`43`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.

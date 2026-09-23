@@ -178,7 +178,9 @@ codigos/
 ├── 41_graficos_grilla_nh_h4.py            # graficos de retorno en el tiempo y entrada/salida, h4 fijo comparando N
 ├── 42_backtest_walkforward_diario_grilla_nh_largo.py  # Issue #11: extiende la grilla a N=10,12,14,20 (mismo dataset/entorno del Issue #10)
 ├── 43_graficos_resumen_grilla_nh_extendida.py  # Issue #11: Sharpe/drawdown/%stop-loss promedio por N, grilla completa (N=3 a 20)
-└── 51_verificar_liquidez_commodities_nok.py  # Issue #13 Fase 0: liquidez de WTI/oro/platino/soja/hierro/NOK vs. umbral de litio, re-verifica ticks de BRL/ZAR
+├── 51_verificar_liquidez_commodities_nok.py  # Issue #13 Fase 0: liquidez de WTI/oro/platino/soja/hierro/NOK vs. umbral de litio, re-verifica ticks de BRL/ZAR
+├── 52_screening_correlacion_commodities_fx.py  # Issue #13 Fase 1: NOK/ZAR/BRL x 5 commodities, escaneo de rezagos -2..+3, correccion FDR sobre 90 pruebas
+└── 53_bootstrap_spa_supervivientes.py  # Issue #13 Fase 1: refuerza los 10 supervivientes FDR (rezago +1) con bootstrap SPA de Hansen
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP
