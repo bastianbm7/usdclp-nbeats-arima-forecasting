@@ -1,0 +1,36 @@
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  panel ventana 1/5: 60/60 con forecast, 66.7 min
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  panel ventana 2/5: 60/60 con forecast, 107.1 min
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  panel ventana 3/5: 60/60 con forecast, 143.5 min
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  panel ventana 4/5: 60/60 con forecast, 180.1 min
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  panel ventana 5/5: 60/60 con forecast, 215.7 min
+[ok] ../datos/resultados/correccion_tft_panel_forecasts.csv

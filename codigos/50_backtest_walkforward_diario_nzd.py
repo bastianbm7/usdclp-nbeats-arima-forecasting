@@ -1,3 +1,14 @@
+# INVALIDADO / SUPERADO (2026-09-23) - el backtest NZD: ver script 64 (lote A) + 65.
+# Motivo: artefacto de timestamp (la barra diaria Yahoo FX con fecha D es el precio
+# de ~20:00 NY de D-1, el cierre de un futuro de commodity con fecha D es su
+# settlement de ~13:00-14:30 ET de D; el merge_asof(direction='backward') por
+# fecha usaba informacion posterior al precio de entrada) + costos cobrados una
+# sola vez al cambiar de posicion en vez de ida+vuelta en cada operacion. Ver
+# alineacion_temporal.py, costos_y_estadistica.py y la errata en 9.35 del paper.
+# Se conserva sin cambios de logica como registro de los numeros originales; no
+# reproduce exactamente sus CSV si se vuelve a correr despues de la correccion de
+# costos en 27/32/36.
+#
 # Issue #12, paso 3: mismo experimento que 48_backtest_walkforward_diario_aud.py
 # pero sobre el dataset de NZD/USD (47_generar_dataset_rl_diario_nzd.py).
 # Recordatorio del caveat del Issue: esto testea la senal GENERICA de cobre

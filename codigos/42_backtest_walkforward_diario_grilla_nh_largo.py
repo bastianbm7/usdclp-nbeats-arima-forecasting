@@ -1,3 +1,14 @@
+# INVALIDADO / SUPERADO (2026-09-23) - la grilla N x h extendida: ver script 64 (lote D, subconjunto) + 65.
+# Motivo: artefacto de timestamp (la barra diaria Yahoo FX con fecha D es el precio
+# de ~20:00 NY de D-1, el cierre de un futuro de commodity con fecha D es su
+# settlement de ~13:00-14:30 ET de D; el merge_asof(direction='backward') por
+# fecha usaba informacion posterior al precio de entrada) + costos cobrados una
+# sola vez al cambiar de posicion en vez de ida+vuelta en cada operacion. Ver
+# alineacion_temporal.py, costos_y_estadistica.py y la errata en 9.35 del paper.
+# Se conserva sin cambios de logica como registro de los numeros originales; no
+# reproduce exactamente sus CSV si se vuelve a correr despues de la correccion de
+# costos en 27/32/36.
+#
 # Issue #11: extension directa de la grilla del Issue #10 (40) a ventanas de
 # holding mas largas (N=10,12,14,20) - Bastian observo que N=7 (el mas largo
 # de la grilla original) tenia el mejor perfil de riesgo (menos stop-loss,

@@ -1,0 +1,7 @@
+dataset,filas_original,filas_alineado,filas_eliminadas,nhits_intactos,orig_corr_cobre_vs_retorno_que_termina_en_la_fila,orig_corr_cobre_vs_retorno_siguiente_(el_operado),alin_corr_cobre_vs_retorno_que_termina_en_la_fila_(contemp),alin_corr_cobre_vs_retorno_siguiente_(operable),archivo
+clp,1464,1454,10,True,-0.04296006069783828,-0.23651822120317262,-0.21896489229091043,-0.10297693922367185,dataset_entrenamiento_rl_diario_alineado.csv
+clp_h3,1464,1454,10,True,-0.0401803185604295,-0.2303319573058055,-0.23002394528089365,-0.10485511706862477,dataset_entrenamiento_rl_diario_h3_alineado.csv
+clp_h5,1459,1449,10,True,-0.042344258594266895,-0.2215432898163272,-0.22109109555527742,-0.09276148438738231,dataset_entrenamiento_rl_diario_h5_alineado.csv
+aud,1469,1469,0,True,0.10410032997917591,0.4208642141075898,0.4129070815421523,-0.0030435621806330767,dataset_entrenamiento_rl_diario_aud_alineado.csv
+cad,1469,1466,3,True,0.09159406333355456,0.3164405403515144,0.31256342821501193,-0.02129334538648151,dataset_entrenamiento_rl_diario_cad_alineado.csv
+nzd,1469,1468,1,True,0.08699121679350633,0.36815724963678365,0.35767607169837184,0.00556004795614859,dataset_entrenamiento_rl_diario_nzd_alineado.csv

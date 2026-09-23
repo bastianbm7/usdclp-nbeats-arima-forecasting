@@ -1,0 +1,3 @@
+universo,n_estrategias,T,p_lower,p_consistent,p_upper,"n_mejores_que_no_operar_(consistent,5%)",mejores,sharpe_max_del_universo,estrategia_sharpe_max,sharpe_max_esperado_bajo_nulo
+bruto (spread 0),90,4106,0.3892,0.54,0.5462,0,,0.5931655044943993,BRLxPL_F_rez2_+,0.6176846627689938
+neto (spread ida+vuelta por moneda),90,4106,0.7284,0.9998,1.0,0,,-0.5682268874684618,NOKxGC_F_rez3_-,0.6176846627689938

@@ -102,8 +102,10 @@ class USDCLPTradingEnvDiarioTPAdaptativo(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, dataset_path=DATASET_PATH_H3, slippage_pct=SLIPPAGE_PCT, capital_inicial=CAPITAL_INICIAL,
-                 riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS, df=None, accion_continua=False):
+                 riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS, df=None, accion_continua=False,
+                 costo_ida_vuelta_pct=multidia_mod.COSTO_IDA_VUELTA_PCT):
         super().__init__()
+        self.costo_ida_vuelta_pct = costo_ida_vuelta_pct  # CORRECCION (2026-09-23): mismo bug de costos que 27/32
         base = df.reset_index(drop=True) if df is not None else cargar_dataset_h3(dataset_path)
         decisiones = multidia_mod.construir_decisiones_multidia(base, DIAS_HOLDING)  # reusado tal cual de 32
         self.df = precomputar_salidas_tp_sl_adaptativo(decisiones, k_stop_loss)
@@ -156,7 +158,8 @@ class USDCLPTradingEnvDiarioTPAdaptativo(gym.Env):
             notional = abs(posicion) * (self.riesgo_max_pct * capital_previo) / distancia_riesgo if distancia_riesgo > 0 else 0.0
             precio_salida, razon = fila[f"precio_salida_{direccion}"], fila[f"razon_cierre_{direccion}"]
             retorno_pct = signo * (precio_salida - fila["y"]) / fila["y"]
-            costo_slippage = self.slippage_pct * notional if posicion != self._posicion_previa else 0.0
+            # CORRECCION (2026-09-23): spread ida+vuelta en CADA operacion (antes: 0.05% solo si la posicion cambiaba)
+            costo_slippage = self.costo_ida_vuelta_pct * notional
             pnl = notional * retorno_pct - costo_slippage
 
         self.capital += pnl

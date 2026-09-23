@@ -1,0 +1,37 @@
+Lote A,B,C,D parte 2/7: 6 corridas
+  diario clp N=1 h=1 seed=123 ventana 1/5: 113s acumulados
+  diario clp N=1 h=1 seed=123 ventana 2/5: 248s acumulados
+  diario clp N=1 h=1 seed=123 ventana 3/5: 402s acumulados
+  diario clp N=1 h=1 seed=123 ventana 4/5: 586s acumulados
+  diario clp N=1 h=1 seed=123 ventana 5/5: 767s acumulados
+[ok] ../datos/resultados/correccion_rl/diario_clp_N1_h1_seed123.csv (12.8 min)
+  diario nzd N=1 h=1 seed=42 ventana 1/5: 188s acumulados
+  diario nzd N=1 h=1 seed=42 ventana 2/5: 376s acumulados
+  diario nzd N=1 h=1 seed=42 ventana 3/5: 561s acumulados
+  diario nzd N=1 h=1 seed=42 ventana 4/5: 742s acumulados
+  diario nzd N=1 h=1 seed=42 ventana 5/5: 927s acumulados
+[ok] ../datos/resultados/correccion_rl/diario_nzd_N1_h1_seed42.csv (15.5 min)
+  multidia clp N=3 h=1 seed=7 ventana 1/5: 194s acumulados
+  multidia clp N=3 h=1 seed=7 ventana 2/5: 382s acumulados
+  multidia clp N=3 h=1 seed=7 ventana 3/5: 570s acumulados
+  multidia clp N=3 h=1 seed=7 ventana 4/5: 763s acumulados
+  multidia clp N=3 h=1 seed=7 ventana 5/5: 960s acumulados
+[ok] ../datos/resultados/correccion_rl/multidia_clp_N3_h1_seed7.csv (16.0 min)
+  tpadapt clp_h3 N=3 h=0 seed=123 ventana 1/5: 194s acumulados
+  tpadapt clp_h3 N=3 h=0 seed=123 ventana 2/5: 383s acumulados
+  tpadapt clp_h3 N=3 h=0 seed=123 ventana 3/5: 570s acumulados
+  tpadapt clp_h3 N=3 h=0 seed=123 ventana 4/5: 759s acumulados
+  tpadapt clp_h3 N=3 h=0 seed=123 ventana 5/5: 949s acumulados
+[ok] ../datos/resultados/correccion_rl/tpadapt_clp_h3_N3_h0_seed123.csv (15.8 min)
+  multidia clp_h5 N=5 h=1 seed=42 ventana 1/5: 194s acumulados
+  multidia clp_h5 N=5 h=1 seed=42 ventana 2/5: 378s acumulados
+  multidia clp_h5 N=5 h=1 seed=42 ventana 3/5: 552s acumulados
+  multidia clp_h5 N=5 h=1 seed=42 ventana 4/5: 723s acumulados
+  multidia clp_h5 N=5 h=1 seed=42 ventana 5/5: 887s acumulados
+[ok] ../datos/resultados/correccion_rl/multidia_clp_h5_N5_h1_seed42.csv (14.8 min)
+  multidia clp_h5 N=14 h=2 seed=42 ventana 1/5: 140s acumulados
+  multidia clp_h5 N=14 h=2 seed=42 ventana 2/5: 273s acumulados
+  multidia clp_h5 N=14 h=2 seed=42 ventana 3/5: 403s acumulados
+  multidia clp_h5 N=14 h=2 seed=42 ventana 4/5: 537s acumulados
+  multidia clp_h5 N=14 h=2 seed=42 ventana 5/5: 667s acumulados
+[ok] ../datos/resultados/correccion_rl/multidia_clp_h5_N14_h2_seed42.csv (11.1 min)

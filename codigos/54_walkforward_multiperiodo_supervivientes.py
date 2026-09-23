@@ -1,3 +1,14 @@
+# INVALIDADO / SUPERADO (2026-09-23) - los regimenes (pares y signo elegidos con una muestra que incluye los regimenes): ver script 62.
+# Motivo: artefacto de timestamp (la barra diaria Yahoo FX con fecha D es el precio
+# de ~20:00 NY de D-1, el cierre de un futuro de commodity con fecha D es su
+# settlement de ~13:00-14:30 ET de D; el merge_asof(direction='backward') por
+# fecha usaba informacion posterior al precio de entrada) + costos cobrados una
+# sola vez al cambiar de posicion en vez de ida+vuelta en cada operacion. Ver
+# alineacion_temporal.py, costos_y_estadistica.py y la errata en 9.35 del paper.
+# Se conserva sin cambios de logica como registro de los numeros originales; no
+# reproduce exactamente sus CSV si se vuelve a correr despues de la correccion de
+# costos en 27/32/36.
+#
 # Issue #13, Fase 2: para los 10 pares moneda-commodity que sobrevivieron
 # Fase 1 (FDR + bootstrap SPA, rezago +1 - ver 52/53), valida que la relacion
 # no sea un artefacto de todo-el-historico mirando MULTIPLES regimenes

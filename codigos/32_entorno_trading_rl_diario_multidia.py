@@ -48,6 +48,11 @@ DATASET_PATH = entorno_diario_mod.DATASET_PATH
 ACCION_CORTO, ACCION_PLANO, ACCION_LARGO = entorno_diario_mod.ACCION_CORTO, entorno_diario_mod.ACCION_PLANO, entorno_diario_mod.ACCION_LARGO
 POSICION_POR_ACCION = entorno_diario_mod.POSICION_POR_ACCION
 SLIPPAGE_PCT = entorno_diario_mod.SLIPPAGE_PCT
+# CORRECCION (2026-09-23): mismo bug de costos que 27 (ver nota ahi) - cada
+# decision de N dias es una operacion completa que se cierra al final del
+# bloque o al tocar TP/SL/trailing: se cobra el spread ida+vuelta completo
+# sobre el notional en CADA operacion, no solo cuando la posicion cambia.
+COSTO_IDA_VUELTA_PCT = entorno_diario_mod.COSTO_IDA_VUELTA_PCT
 CAPITAL_INICIAL = entorno_diario_mod.CAPITAL_INICIAL
 RIESGO_MAX_PCT = entorno_diario_mod.RIESGO_MAX_PCT
 K_STOP_LOSS = entorno_diario_mod.K_STOP_LOSS
@@ -179,8 +184,9 @@ class USDCLPTradingEnvDiarioMultidia(gym.Env):
 
     def __init__(self, dataset_path=DATASET_PATH, dias_holding=1, slippage_pct=SLIPPAGE_PCT,
                  capital_inicial=CAPITAL_INICIAL, riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS,
-                 df=None, accion_continua=False, horizonte_tp=1):
+                 df=None, accion_continua=False, horizonte_tp=1, costo_ida_vuelta_pct=COSTO_IDA_VUELTA_PCT):
         super().__init__()
+        self.costo_ida_vuelta_pct = costo_ida_vuelta_pct  # CORRECCION (2026-09-23)
         # df explicito = pasar un slice ya cargado (train/test split) sin
         # releer el CSV - mismo patron que 27_entorno_trading_rl_diario.py.
         # OJO: el slice de train/test tiene que hacerse ANTES de submuestrear
@@ -251,7 +257,8 @@ class USDCLPTradingEnvDiarioMultidia(gym.Env):
             precio_salida, razon = fila[f"precio_salida_{direccion}"], fila[f"razon_cierre_{direccion}"]
             dias_hasta_salida, fecha_salida = fila[f"dias_hasta_salida_{direccion}"], fila[f"fecha_salida_{direccion}"]
             retorno_pct = signo * (precio_salida - fila["y"]) / fila["y"]
-            costo_slippage = self.slippage_pct * notional if posicion != self._posicion_previa else 0.0
+            # CORRECCION (2026-09-23): antes "self.slippage_pct * notional if posicion != self._posicion_previa else 0.0"
+            costo_slippage = self.costo_ida_vuelta_pct * notional
             pnl = notional * retorno_pct - costo_slippage
 
         self.capital += pnl

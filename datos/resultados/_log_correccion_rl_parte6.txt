@@ -1,0 +1,31 @@
+Lote A,B,C,D parte 6/7: 5 corridas
+  diario cad N=1 h=1 seed=42 ventana 1/5: 116s acumulados
+  diario cad N=1 h=1 seed=42 ventana 2/5: 259s acumulados
+  diario cad N=1 h=1 seed=42 ventana 3/5: 417s acumulados
+  diario cad N=1 h=1 seed=42 ventana 4/5: 602s acumulados
+  diario cad N=1 h=1 seed=42 ventana 5/5: 783s acumulados
+[ok] ../datos/resultados/correccion_rl/diario_cad_N1_h1_seed42.csv (13.1 min)
+  multidia clp N=2 h=1 seed=7 ventana 1/5: 194s acumulados
+  multidia clp N=2 h=1 seed=7 ventana 2/5: 380s acumulados
+  multidia clp N=2 h=1 seed=7 ventana 3/5: 566s acumulados
+  multidia clp N=2 h=1 seed=7 ventana 4/5: 755s acumulados
+  multidia clp N=2 h=1 seed=7 ventana 5/5: 943s acumulados
+[ok] ../datos/resultados/correccion_rl/multidia_clp_N2_h1_seed7.csv (15.7 min)
+  multidia clp N=5 h=1 seed=123 ventana 1/5: 193s acumulados
+  multidia clp N=5 h=1 seed=123 ventana 2/5: 384s acumulados
+  multidia clp N=5 h=1 seed=123 ventana 3/5: 572s acumulados
+  multidia clp N=5 h=1 seed=123 ventana 4/5: 762s acumulados
+  multidia clp N=5 h=1 seed=123 ventana 5/5: 957s acumulados
+[ok] ../datos/resultados/correccion_rl/multidia_clp_N5_h1_seed123.csv (15.9 min)
+  multidia clp_h5 N=3 h=1 seed=42 ventana 1/5: 192s acumulados
+  multidia clp_h5 N=3 h=1 seed=42 ventana 2/5: 383s acumulados
+  multidia clp_h5 N=3 h=1 seed=42 ventana 3/5: 573s acumulados
+  multidia clp_h5 N=3 h=1 seed=42 ventana 4/5: 763s acumulados
+  multidia clp_h5 N=3 h=1 seed=42 ventana 5/5: 950s acumulados
+[ok] ../datos/resultados/correccion_rl/multidia_clp_h5_N3_h1_seed42.csv (15.8 min)
+  multidia clp_h5 N=7 h=2 seed=42 ventana 1/5: 191s acumulados
+  multidia clp_h5 N=7 h=2 seed=42 ventana 2/5: 372s acumulados
+  multidia clp_h5 N=7 h=2 seed=42 ventana 3/5: 543s acumulados
+  multidia clp_h5 N=7 h=2 seed=42 ventana 4/5: 714s acumulados
+  multidia clp_h5 N=7 h=2 seed=42 ventana 5/5: 875s acumulados
+[ok] ../datos/resultados/correccion_rl/multidia_clp_h5_N7_h2_seed42.csv (14.6 min)

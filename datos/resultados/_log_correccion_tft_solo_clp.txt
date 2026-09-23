@@ -1,0 +1,36 @@
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  solo_clp ventana 1/5: 60/60 con forecast, 64.2 min
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  solo_clp ventana 2/5: 60/60 con forecast, 104.1 min
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  solo_clp ventana 3/5: 60/60 con forecast, 139.2 min
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  solo_clp ventana 4/5: 60/60 con forecast, 174.5 min
+Seed set to 42
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+`Trainer.fit` stopped: `max_steps=1500` reached.
+GPU available: False, used: False
+TPU available: False, using: 0 TPU cores
+  solo_clp ventana 5/5: 60/60 con forecast, 209.9 min
+[ok] ../datos/resultados/correccion_tft_solo_clp_forecasts.csv

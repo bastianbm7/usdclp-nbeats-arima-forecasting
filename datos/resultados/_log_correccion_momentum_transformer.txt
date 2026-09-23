@@ -1,0 +1,25 @@
+seed 42: 730s | bruto Sharpe=1.22 | rotacion=-0.21
+seed 7: 704s | bruto Sharpe=-0.51 | rotacion=-1.85
+seed 123: 691s | bruto Sharpe=1.02 | rotacion=-0.41
+seed 2024: 704s | bruto Sharpe=1.41 | rotacion=0.08
+seed 99: 701s | bruto Sharpe=0.89 | rotacion=-0.37
+                           estrategia  retorno_total_%  max_drawdown_%  sharpe  se_sharpe  ic95_bajo  ic95_alto  n_obs  seed  acierto_direccion_%  corr_posicion_retorno  exposicion_media  pct_dias_saturado                   costo
+Momentum Transformer Lite (corregido)            3.860          -2.301   1.220      0.926     -0.781      3.234    295    42               52.542                  0.081             0.202                0.0                   bruto
+Momentum Transformer Lite (corregido)           -5.019          -6.065  -1.623      0.927     -3.739      0.549    295    42               52.542                  0.081             0.202                0.0 ida+vuelta diaria 0.15%
+Momentum Transformer Lite (corregido)           -0.697          -3.126  -0.211      0.924     -2.182      1.776    295    42               52.542                  0.081             0.202                0.0          rotacion 0.15%
+Momentum Transformer Lite (corregido)           -1.339          -3.148  -0.505      0.924     -2.350      1.499    295     7               44.746                 -0.025             0.170                0.0                   bruto
+Momentum Transformer Lite (corregido)           -8.509          -8.646  -3.303      0.934     -5.162     -1.346    295     7               44.746                 -0.025             0.170                0.0 ida+vuelta diaria 0.15%
+Momentum Transformer Lite (corregido)           -4.741          -5.482  -1.846      0.927     -3.711      0.108    295     7               44.746                 -0.025             0.170                0.0          rotacion 0.15%
+Momentum Transformer Lite (corregido)            4.311          -3.765   1.022      0.925     -1.129      2.994    295   123               52.542                  0.063             0.262                0.0                   bruto
+Momentum Transformer Lite (corregido)           -7.102         -10.186  -1.725      0.927     -4.119      0.431    295   123               52.542                  0.063             0.262                0.0 ida+vuelta diaria 0.15%
+Momentum Transformer Lite (corregido)           -1.757          -6.662  -0.405      0.924     -2.626      1.598    295   123               52.542                  0.063             0.262                0.0          rotacion 0.15%
+Momentum Transformer Lite (corregido)            5.023          -3.153   1.412      0.926     -0.593      3.308    295  2024               52.542                  0.083             0.203                0.0                   bruto
+Momentum Transformer Lite (corregido)           -4.019          -6.410  -1.170      0.926     -3.350      0.833    295  2024               52.542                  0.083             0.203                0.0 ida+vuelta diaria 0.15%
+Momentum Transformer Lite (corregido)            0.230          -4.063   0.080      0.924     -2.037      2.018    295  2024               52.542                  0.083             0.203                0.0          rotacion 0.15%
+Momentum Transformer Lite (corregido)            2.874          -1.517   0.886      0.925     -0.841      2.559    295    99               50.847                  0.065             0.193                0.0                   bruto
+Momentum Transformer Lite (corregido)           -5.531          -6.300  -1.734      0.927     -3.609      0.047    295    99               50.847                  0.065             0.193                0.0 ida+vuelta diaria 0.15%
+Momentum Transformer Lite (corregido)           -1.227          -3.158  -0.369      0.924     -2.145      1.316    295    99               50.847                  0.065             0.193                0.0          rotacion 0.15%
+                  costo  sharpe_medio  sharpe_min  sharpe_max  retorno_medio_pct  acierto_medio  corr_media
+                  bruto         0.807      -0.505       1.412              2.946         50.644       0.053
+ida+vuelta diaria 0.15%        -1.911      -3.303      -1.170             -6.036         50.644       0.053
+         rotacion 0.15%        -0.550      -1.846       0.080             -1.639         50.644       0.053

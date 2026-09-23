@@ -54,6 +54,18 @@ ACCION_CORTO, ACCION_PLANO, ACCION_LARGO = 0, 1, 2
 POSICION_POR_ACCION = {ACCION_CORTO: -1.0, ACCION_PLANO: 0.0, ACCION_LARGO: 1.0}
 
 SLIPPAGE_PCT = 0.0005  # mismo valor que el agente semanal (11_entorno_trading_rl.py) y que 22_kelly_diario_cobre.py
+# CORRECCION (2026-09-23): BUG DE COSTOS. step() cobraba SLIPPAGE_PCT una sola
+# vez, solo al entrar y solo si la posicion cambiaba respecto al dia anterior
+# (linea "costo_slippage = ... if posicion != self._posicion_previa"). Pero en
+# este entorno CADA decision es una operacion completa: se abre al precio de
+# la fila y se cierra en y_next (o al tocar TP/SL) - una ida+vuelta por dia,
+# siempre. Con el notional del risk sizing (3.8-5.9x el capital) ese costo
+# omitido cambiaba el signo del resultado. Ahora se cobra el spread
+# ida+vuelta completo sobre el notional en CADA operacion. El valor por
+# defecto es el supuesto para USD/CLP (costos_y_estadistica.SPREAD_IDA_VUELTA);
+# los scripts corregidos (64+) pasan el spread de cada par. SLIPPAGE_PCT se
+# conserva solo como registro del valor original (ya no se usa en step()).
+COSTO_IDA_VUELTA_PCT = 0.0015
 CAPITAL_INICIAL = 100.0
 RIESGO_MAX_PCT = 0.03  # identico al agente semanal - ver nota de diseno arriba (corrige el bug de apalancamiento sin acotar de 9.14/9.15)
 K_STOP_LOSS = 1.0
@@ -149,8 +161,10 @@ class USDCLPTradingEnvDiario(gym.Env):
     metadata = {"render_modes": []}
 
     def __init__(self, dataset_path=DATASET_PATH, slippage_pct=SLIPPAGE_PCT, capital_inicial=CAPITAL_INICIAL,
-                 riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS, df=None, accion_continua=False):
+                 riesgo_max_pct=RIESGO_MAX_PCT, k_stop_loss=K_STOP_LOSS, df=None, accion_continua=False,
+                 costo_ida_vuelta_pct=COSTO_IDA_VUELTA_PCT):
         super().__init__()
+        self.costo_ida_vuelta_pct = costo_ida_vuelta_pct  # CORRECCION (2026-09-23), ver nota junto a COSTO_IDA_VUELTA_PCT
         # df explicito = pasar un slice ya cargado (train/test split) sin releer
         # ni reprocesar el CSV - mismo patron que 11_entorno_trading_rl.py,
         # usado por el walk-forward de 28_backtest_walkforward_diario.py.
@@ -203,7 +217,8 @@ class USDCLPTradingEnvDiario(gym.Env):
             notional = abs(posicion) * (self.riesgo_max_pct * capital_previo) / distancia_riesgo if distancia_riesgo > 0 else 0.0
             precio_salida, razon = fila[f"precio_salida_{direccion}"], fila[f"razon_cierre_{direccion}"]
             retorno_pct = signo * (precio_salida - fila["y"]) / fila["y"]
-            costo_slippage = self.slippage_pct * notional if posicion != self._posicion_previa else 0.0
+            # CORRECCION (2026-09-23): antes "self.slippage_pct * notional if posicion != self._posicion_previa else 0.0"
+            costo_slippage = self.costo_ida_vuelta_pct * notional
             pnl = notional * retorno_pct - costo_slippage
 
         self.capital += pnl

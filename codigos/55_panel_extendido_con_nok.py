@@ -1,3 +1,14 @@
+# INVALIDADO / SUPERADO (2026-09-23) - las columnas de cobre del panel extendido: ver script 60.
+# Motivo: artefacto de timestamp (la barra diaria Yahoo FX con fecha D es el precio
+# de ~20:00 NY de D-1, el cierre de un futuro de commodity con fecha D es su
+# settlement de ~13:00-14:30 ET de D; el merge_asof(direction='backward') por
+# fecha usaba informacion posterior al precio de entrada) + costos cobrados una
+# sola vez al cambiar de posicion en vez de ida+vuelta en cada operacion. Ver
+# alineacion_temporal.py, costos_y_estadistica.py y la errata en 9.35 del paper.
+# Se conserva sin cambios de logica como registro de los numeros originales; no
+# reproduce exactamente sus CSV si se vuelve a correr despues de la correccion de
+# costos en 27/32/36.
+#
 # Issue #13, Fase 3 (paso 1): extiende el panel de 13 pares de 9.14
 # (datos/bases/panel_fx_diario.csv) agregando NOK, que sobrevivio Fase 0
 # (51_verificar_liquidez_commodities_nok.py) pero no estaba en el panel

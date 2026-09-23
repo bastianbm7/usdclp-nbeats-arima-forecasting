@@ -9,6 +9,8 @@ Este trabajo compara dos arquitecturas de deep learning para pronóstico de seri
 
 El hallazgo central no es "el deep learning gana" ni "el baseline clásico gana", sino que **la estructura dominante de una serie financiera cambia con la escala de tiempo y con el modo de entrenamiento**, y el modelo ganador cambia con ella — incluyendo un caso de inestabilidad real y no resuelta (aprendizaje online a escala mensual con horizonte de 3 pasos) que se documenta en vez de ocultar.
 
+La sección 9 extiende el trabajo a una pregunta distinta — ¿sirve el forecast para operar con apalancamiento y costos reales? — con un agente de Reinforcement Learning. A frecuencia semanal, ninguna de las variantes probadas encuentra una política rentable (el agente aprende a no operar). Una versión anterior de este documento reportaba que, a frecuencia **diaria**, el retorno del cobre "predecía" el de USD/CLP del día siguiente (r=-0.256) y que estrategias construidas sobre esa señal (reglas simples, Kelly, PPO, Momentum Transformer) alcanzaban Sharpe de 4-5 fuera de muestra, generalizando a otras monedas y commodities. **Esa conclusión era incorrecta** (errata del 2026-09-23, sección 9.35): Yahoo etiqueta las barras diarias FX con el precio de ~20:00 de Nueva York del día *anterior*, mientras el cierre de un futuro de commodity es el settlement de ~13:00 ET del mismo día, así que la "predicción" era la correlación contemporánea mal fechada; además los backtests entraban a un precio anterior a la señal y cobraban solo una fracción del costo de transacción real. Con la alineación temporal corregida — verificada con barras horarias, con el dólar observado del Banco Central de Chile y con una fuente independiente (FRED H.10) —, costos ida+vuelta realistas, selección de parámetros solo con datos pasados e intervalos de confianza, **ninguna estrategia diaria del proyecto tiene un Sharpe neto de costos distinguible de cero o positivo**. La lectura final de la sección 9 es la misma que ya daba la línea semanal: con estas señales y a estas frecuencias, no hay edge explotable, y un agente que siente el costo real aprende a no operar.
+
 ## 1. Pregunta de investigación
 
 ¿Un modelo moderno de deep learning aporta una mejora real y medible sobre un baseline estadístico clásico al pronosticar un tipo de cambio, o la mejora observada es mayormente autocorrelación del precio (el valor de hoy predice casi perfecto el de mañana)? Y si la respuesta depende de la escala de tiempo o de si el modelo se reentrena a medida que llegan datos nuevos — ¿de qué depende exactamente?
@@ -138,6 +140,8 @@ La lectura de portfolio no es "el deep learning gana siempre" ni "el baseline cl
 - Nixtla. [statsforecast](https://github.com/Nixtla/statsforecast) y [neuralforecast](https://github.com/Nixtla/neuralforecast) (Apache-2.0).
 
 ## 9. Extensión: estrategia de trading con Reinforcement Learning (septiembre 2026)
+
+> **⚠️ Errata (2026-09-23)**: los resultados de la línea **diaria** de esta extensión (9.13-9.14, 9.17, 9.20, 9.22-9.28, 9.31-9.34) estaban invalidados por un artefacto de timestamps entre las barras diarias FX de Yahoo y los settlements de futuros de commodities (la "predicción" del cobre era la correlación contemporánea), por un bug de costos (spread cobrado una fracción de las veces) y por ejecución a un precio anterior a la señal. Esas secciones se reescribieron con la metodología corregida; la explicación completa, la evidencia y los números originales están en **9.35**. La línea semanal (9.1-9.12, 9.16, 9.18) no está afectada.
 
 El forecasting de precio (secciones 1-7) responde si un modelo predice bien. Esta extensión responde una pregunta distinta: **¿ese forecast sirve para tomar decisiones de trading que ganen plata, una vez que se cuentan el apalancamiento y el riesgo real?** Es un proyecto separado dentro del mismo repo (Issue [#1](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/1)), no una sección más del estudio de forecasting.
 
@@ -321,94 +325,90 @@ Aunque el Tier 0/2 (9.11) ya sugería que ninguna variable nueva iba a cambiar l
 
 **Lectura acumulada de 9.9 + 9.11 + 9.12**: de 6 variantes independientes probadas sobre el mismo agente/entorno (más exploración, acción continua, exceso sobre buy-and-hold, Kelly, momentum, DSR), solo dos cambiaron el comportamiento del agente (acción continua y momentum) y ambas perdieron plata igual — ninguna encontró una política rentable. La propuesta 1 de la sección 9.8 queda validada con evidencia, no solo con intuición: **el cuello de botella de este proyecto, a la escala y con los datos disponibles hoy, es la señal — no el agente, no el reward, no el espacio de acción.**
 
-### 9.13 Seguimiento: el efecto del cobre aparece a frecuencia diaria, no semanal
+### 9.13 Seguimiento: el efecto del cobre a frecuencia diaria — era contemporáneo, no predictivo (corregido 2026-09-23)
 
-La sección 9.11 dejó un cabo suelto explícito: Ferraro, Rogoff & Rossi (2015) — el paper que ancla la hipótesis de cobre como predictor de CLP — encuentran ese efecto a frecuencia **diaria**, no mensual, y el chequeo de 9.11 se hizo a frecuencia semanal (la que usa el agente). Se repitió el mismo chequeo de correlación (`21_features_nuevas_frecuencias.py`) a diario y a mensual, reusando los mismos datos de cobre/tasas ya descargados.
+> **⚠️ Errata (2026-09-23), leer antes que nada del resto de la sección 9 diaria.** La versión original de esta sección reportaba que `copper_ret_1d` correlacionaba **-0.256 con el retorno del día siguiente** de USD/CLP y lo presentaba como la señal predictiva más fuerte del proyecto. Dos auditorías independientes, y la evidencia que se reproduce en 9.35, muestran que ese número es un **artefacto de timestamps**: Yahoo etiqueta la barra diaria de un par FX con fecha D pero su precio es el de ~00:00 UTC de D (≈20:00 de Nueva York del día D-1), mientras el "cierre" diario de `HG=F` con fecha D es el settlement de ~13:00 ET del día D. El "retorno del día siguiente" de USD/CLP que se usaba (fila D+1) cubre 17 de las 24 horas de la ventana del retorno del cobre de la fila D — es mayormente la **reacción simultánea** al mismo shock, no una predicción. Todo lo construido encima (9.14, 9.17, 9.20-9.28, 9.31-9.34) heredó el problema y se rehízo con la alineación corregida (`codigos/alineacion_temporal.py`) y costos realistas (`codigos/costos_y_estadistica.py`). La errata completa, con las tablas de evidencia y los números originales, está en **9.35**.
 
-| Frecuencia | Feature | Correlación con retorno futuro | Supera \|r\|=0.11 |
+La sección 9.11 dejó un cabo suelto: Ferraro, Rogoff & Rossi (2015) encuentran el efecto cobre→CLP a frecuencia **diaria**, y el chequeo de 9.11 se hizo a frecuencia semanal. El chequeo diario original (`21_features_nuevas_frecuencias.py`) fusionaba el cobre con `merge_asof(direction="backward")` por fecha: a la fila de USD/CLP con fecha D le tocaba el settlement de cobre de ese mismo D — que ocurre ~17 horas **después** del precio FX de esa fila. La versión corregida (`59_senal_cobre_clp_corregida.py`) usa una sola regla: el dato de cobre usable en una fila FX es el del último settlement **estrictamente anterior** al timestamp real del precio FX (equivale a reetiquetar la barra FX D a la tarde de D-1 y dejar el commodity en su fecha).
+
+| Feature (diaria, USD/CLP 2010-2026) | Original: corr. con el retorno de la fila siguiente | **Corregido: corr. con el retorno operable** | Corregido: corr. con el retorno contemporáneo |
 |---|---|---|---|
-| **Diaria** (4.325 obs.) | **`copper_ret_1d`** | **-0.256** | **Sí, más del doble** |
-| Diaria | `copper_mom_5d` | -0.165 | Sí |
-| Diaria | `copper_mom_20d` | -0.075 | No |
-| Diaria | `rate_diff` | 0.004 | No |
-| Mensual (197 obs.) | `copper_ret_1m` | 0.105 | No (por poco) |
-| Mensual | `rate_diff` | 0.013 | No |
-| Mensual | `copper_mom_3m` | 0.004 | No |
-| Semanal (9.11, referencia) | `copper_mom_4s` | -0.082 | No |
+| `copper_ret_1d` | -0.256 | **-0.078** | -0.254 |
+| `copper_mom_5d` | -0.165 | **-0.041** | -0.163 |
+| `copper_mom_20d` | -0.075 | **-0.014** | -0.072 |
+| `rate_diff` | 0.004 | 0.004 | 0.004 |
 
-![Correlación de cobre/tasas por frecuencia](../datos/resultados/analisis_features_nuevas_correlacion_frecuencias.png)
+(`datos/resultados/correccion_clp_features_diarias_913.csv`. "Operable" = retorno desde un precio FX posterior al settlement que generó la señal hasta el siguiente precio FX; "contemporáneo" = el retorno FX cuya ventana se solapa con la del cobre. A mensual, `copper_ret_1m` ya estaba bajo el umbral, 0.105, y un desfase de horas no cambia eso.)
 
-**Es el número más fuerte de toda la investigación de esta noche.** `copper_ret_1d` (retorno diario del cobre, `HG=F` vía `yfinance`) correlaciona -0.256 con el retorno del día siguiente de USD/CLP — más del doble del umbral que ninguna de las 7 variables originales (ni las 5 candidatas semanales de 9.11) logró superar. El signo es el esperado económicamente (cobre sube ⇒ CLP se aprecia ⇒ USD/CLP baja) y `copper_mom_5d` (momentum de 5 días) también supera el umbral (-0.165) — no es un número aislado, hay estructura consistente en la misma dirección a horizontes cortos, que se diluye con la ventana (`copper_mom_20d` ya cae a -0.075, mensual prácticamente a cero). Confirma exactamente el patrón que describe el paper ancla: el efecto cobre-CLP existe pero es de corto plazo, y se pierde al resamplear a semanas o meses — que es justo la escala a la que opera el agente hoy.
+**Lectura corregida, dicha sin atenuar**: el -0.256 que motivó toda la línea diaria es, casi completo, la correlación **contemporánea** entre cobre y CLP (que existe y es bien conocida — el peso chileno se mueve con el cobre el mismo día — pero no se puede operar: para cuando se conoce el settlement del cobre, el peso ya se movió). Lo que queda en la dirección operable es -0.078 en toda la muestra (estable entre 2010-2017, -0.068, y 2018-2026, -0.086): estadísticamente distinto de cero con n≈4.200, pero chico, por debajo del umbral |r|=0.11 que el proyecto usó para todo lo demás, y — como muestran 9.14 y 9.35 — insuficiente para pagar el spread de USD/CLP. El caveat que esta misma sección dejó escrito en su versión original ("no se validó el timestamp de cierre de `HG=F` contra el de `CLP=X` ... podría ser información contemporánea filtrándose como si fuera predictiva") era exactamente el problema; la "validación" de 9.14 lo descartó con un argumento invertido (ver 9.14 y 9.35).
 
-**Caveat metodológico real, no cosmético, antes de festejar el número**: no se validó el timestamp exacto de cierre de `HG=F` (COMEX, vía `yfinance`) contra el de `CLP=X` (el ticker que usa `01_obtener_datos.py` para USD/CLP). Si el cierre del cobre que `yfinance` reporta para el "día t" ocurre, en la práctica, más tarde en el reloj que el cierre de CLP=X para ese mismo día calendario, parte de esta correlación podría ser información contemporánea filtrándose como si fuera predictiva (look-ahead sutil), no una relación causal de un día para el otro. Con los datos de walk-forward de otras partes del proyecto (ej. USD/CLP diario en la sección 4.1) esta clase de detalle de alineación temporal ya demostró importar — no se debe asumir que "un día de diferencia" es suficiente sin comprobarlo.
+### 9.14 Validación del hallazgo diario (corregido 2026-09-23): el timestamp NO estaba limpio, el backtest no es rentable, y el panel repite el mismo artefacto
 
-**Lectura**: esto no cambia la conclusión de que el agente semanal actual no tiene señal explotable — sigue sin tenerla, con las variables y a la frecuencia que opera hoy. Pero sí cambia el diagnóstico de fondo: el problema no es necesariamente que "USD/CLP no tiene edge explotable en ningún lado" — es que, a la frecuencia semanal, la señal de cobre (que sí existe a diario) ya se diluyó. Antes de invertir en Tier 3/4 (multi-activo, arquitecturas nuevas), validar el timestamp y, si se confirma, evaluar si vale la pena una versión diaria del agente es probablemente la pista de mayor retorno esperado por hora invertida de todo lo que se investigó esta noche — pero es una decisión de alcance (cambiar la escala de todo el pipeline) que le corresponde a Bastián, no algo para decidir en automático.
+> **Errata**: esta sección concluía "timestamp limpio, backtest rentable (+86.2%, Sharpe 4.57)". Las dos conclusiones eran incorrectas; se reescribe con la alineación corregida y costos ida+vuelta. Los números originales quedan registrados en 9.35.
 
-### 9.14 Validación del hallazgo diario: timestamp limpio, backtest rentable, y por qué "más monedas" no ayudó
+Bastián pidió validar el caveat de timestamp de 9.13 aunque resultara válido, probar rentabilidad en un backtest y ampliar a un panel de al menos 10 pares — los tres pasos se rehicieron.
 
-Bastián pidió validar el caveat de timestamp de 9.13 aunque resultara válido, probar si la señal es rentable en un backtest real, y ampliar el dataset a un panel de al menos 10 pares de forex — los tres pasos siguientes.
+**Validación de timestamp — el argumento original estaba invertido.** La versión original usó un escaneo de rezagos: como la correlación estaba concentrada en el "rezago +1" (-0.254) y casi nula en el 0 (-0.021), concluyó que no había solapamiento de cierres ("si hubiera contaminación, se vería en el rezago 0"). Eso presupone que la fila FX y la fila de cobre con la misma fecha están en el mismo reloj. No lo están: la fila FX con fecha D es el precio de ~20:00 NY de D-1, el cobre con fecha D es el settlement de ~13:00 ET de D. En el reloj real, el retorno FX del "rezago +1" (20:00 NY de D-1 → 20:00 NY de D) es el que más se solapa con la ventana del cobre (13:00 ET de D-1 → 13:00 ET de D): 17 de 24 horas. **La concentración en +1 es exactamente la firma de la contaminación, no la prueba de su ausencia.** La confirmación viene de comparar las mismas dos variables en relojes consistentes (`58_validacion_timestamp.py`, tabla completa en `errata_timestamp_clp_rezagos.csv`):
 
-**Validación de timestamp**: en vez de reconstruir a mano el horario exacto de cierre de `HG=F` (COMEX, huso horario America/New_York) contra `CLP=X` (Europe/London en yfinance, con huecos de fin de semana por ser un par poco líquido), se usó una prueba más directa y decisiva — un escaneo de correlación por rezago:
-
-| Rezago (copper_ret en t vs. retorno CLP en t+rezago) | Correlación |
-|---|---|
-| -2 | -0.009 |
-| -1 | -0.050 |
-| **0 (mismo día)** | **-0.021** |
-| **+1 (predictivo, el usado en 9.13)** | **-0.254** |
-| +2 | -0.069 |
-| +3 | -0.032 |
-
-El efecto está **concentrado casi por completo en el rezago +1** — si hubiera contaminación por solapamiento de cierres (información del mismo día filtrándose como si fuera predictiva), se esperaría un efecto fuerte también en el rezago 0. La firma es la de un lead-lag genuino de un día, no un artefacto de alineación de timestamps. No es una auditoría exhaustiva al minuto, pero descarta el mecanismo específico de contaminación que se sospechaba.
-
-**Backtest de rentabilidad** (`22_kelly_diario_cobre.py`, walk-forward de 5 ventanas × 60 días = 300 días de test, ~14 meses):
-
-| Estrategia | Retorno total | Sharpe anualizado | Max drawdown | Operaciones |
+| Cobre vs. USD/CLP, alineación | Rezago -1 | Rezago 0 | Rezago +1 | Rezago +2 |
 |---|---|---|---|---|
-| **Kelly diario (con cobre)** | **+86.2%** | **4.57** | **-3.5%** | 300 |
-| Umbral cobre (solo signo, sin regresión) | +83.5% | 4.44 | -3.4% | 290 |
-| Kelly diario (sin cobre) | +6.0% | 0.47 | -9.7% | 300 |
-| Buy-and-hold | -2.7% | -0.13 | -15.4% | 100 |
+| Original del proyecto (Yahoo diario, merge fecha ≤) | -0.050 | -0.021 | **-0.254** | -0.069 |
+| **Corregida** (settlement < timestamp FX; 0 = contemporáneo, +1 = operable) | -0.021 | **-0.253** | **-0.069** | -0.032 |
+| Dólar observado BCCh reetiquetado al día de transacción (promedio intradía) | -0.026 | **-0.385** | -0.119 | -0.020 |
+| Barras horarias Yahoo, cobre y CLP ambos a las 18:00 UTC (730 días) | 0.029 | **-0.437** | 0.018 | 0.004 |
+| Barras horarias Yahoo, ambos a las 20:00 UTC (730 días) | 0.036 | **-0.457** | 0.024 | -0.030 |
 
-![Curva de capital: Kelly diario con/sin cobre](../datos/resultados/kelly_diario_cobre_curva_capital.png)
+En cuanto las dos series se miden en el mismo reloj — con barras horarias a la misma hora, o con el dólar observado del Banco Central fechado al día en que ocurrieron las transacciones — la correlación fuerte aparece en el **rezago 0** (-0.39 a -0.46) y el rezago +1 queda en torno a cero. Con la alineación corregida sobre los mismos datos diarios de Yahoo, el -0.25 pasa al rezago 0 (chequeo de cordura de que la corrección es la correcta) y lo operable es -0.069. La misma conclusión se obtiene con una fuente completamente independiente (FRED H.10, tipo de cambio al mediodía de Nueva York) para AUD, CAD, MXN, NOK, ZAR y BRL — ver 9.35.
 
-Sharpe >4 es un número que hay que mirar con sospecha, no con entusiasmo automático — se verificó que no viene de una sola ventana con suerte: las 5 ventanas del walk-forward son todas positivas individualmente (ganancia de $5.6 a $23.5 cada una), y que la señal simple ("umbral cobre", sin regresión, solo el signo de `copper_ret_1d`) rinde casi lo mismo que la versión con regresión (Kelly) — la ventaja viene genuinamente de la dirección del cobre, no de ruido que la regresión está sobreajustando. Nota de método: a diferencia del backtest semanal (14), esto NO reproduce el trailing-stop/take-profit intradía — a frecuencia diaria no hay datos más finos que el cierre para chequear eso, así que se simula cierre-a-cierre con el mismo costo de slippage. El periodo de test cubre 2025-07 a 2026-09 — los últimos ~14 meses del dataset, no una muestra aleatoria de toda la historia; no se descarta que el resultado sea parcialmente específico del régimen reciente de cobre (una tendencia fuerte y sostenida) y no necesariamente igual de fuerte en periodos de cobre lateral.
+**Backtest corregido** (`59_senal_cobre_clp_corregida.py`, mismo walk-forward de 5 ventanas × 60 días que el original, 2025-07 a 2026-09). Entrada al precio de la fila (ya con la señal conocida), salida en la fila siguiente; signo de la regla de cobre estimado solo con el train de cada ventana (dio -1 en las 5); precios repetidos de Yahoo (feriados) eliminados; spread ida+vuelta de USD/CLP de 0.15% del notional en cada día con posición; IC95 por bootstrap de bloques.
 
-**Corrección importante, encontrada al extender este backtest a los 13 pares del panel**: el +86.2% de la tabla de arriba está inflado por un problema real de la fracción de Kelly calculada — la posición está en el límite de apalancamiento (±1, el 100% del capital) el **97% de los días de test**, tanto para CLP como para USD/PEN (que con este mismo método da un absurdo +860% / Sharpe 9.0, ver `panel_fx_backtest_por_par_metricas.csv`). La causa es matemática, no un bug de código: a frecuencia diaria la varianza del retorno (`vol_realizada²`) es un número muy chico, así que `f*=μ/σ²` explota a valores enormes (hasta 30-40× apalancamiento antes del clip) frente a casi cualquier `μ` predicho — el clip a ±1 esconde que el modelo, sin darse cuenta, está recomendando apostar toda la cuenta todos los días, no dimensionar la apuesta según la confianza real. Ni reducir la fracción de Kelly a 5% del valor calculado cambia esto (sigue saturado el 69% de los días) — el problema es de escala, no de exceso de agresividad puntual.
+| Estrategia (300 días de test) | Original (artefacto, 0.05% solo al cambiar) | **Corregido, bruto** | **Corregido, spread 0.15% ida+vuelta** | Corregido, cota inferior (solo al rotar) |
+|---|---|---|---|---|
+| Umbral cobre | +83.5% / Sharpe 4.45 | +10.9% / 0.78 [-0.78, 2.42] | **-28.2% / -2.25 [-3.74, -0.75]** | -14.4% / -1.02 |
+| Kelly diario (con cobre) | +86.3% / 4.58 | +9.5% / 0.69 [-0.87, 2.25] | **-30.1% / -2.43 [-4.10, -0.82]** | -11.7% / -0.80 |
+| Kelly diario (sin cobre) | +6.1% / 0.47 | +12.8% / 0.91 [-0.60, 2.47] | -27.3% / -2.17 | -8.2% / -0.54 |
+| Buy-and-hold | -2.7% / -0.13 | -2.8% / -0.13 | — | — |
 
-Separando el tamaño de la apuesta de la dirección (usar tamaño **fijo** del capital en vez del tamaño que sugiere Kelly, solo la dirección que predice la regresión) se obtiene una lectura mucho más honesta de cuánto se ganaría en la práctica:
+(`correccion_clp_cobre_walkforward_metricas.csv`, sensibilidad completa en `correccion_clp_cobre_sensibilidad_spread.csv`, curvas en `correccion_clp_cobre_curva_capital.png`.)
 
-| Tamaño de apuesta diaria | Retorno total (300 días) | Sharpe anualizado |
-|---|---|---|
-| 100% del capital (equivalente al backtest de arriba) | +85.6% | 4.53 |
-| 20% del capital | +13.3% | 4.53 |
-| 10% del capital | +6.5% | 4.53 |
-| 3% del capital (similar al riesgo por operación del agente semanal) | +1.9% | 4.53 |
+![Original vs. corregido: USD/CLP + cobre](../datos/resultados/correccion_clp_cobre_curva_capital.png)
 
-**El Sharpe (4.53) no cambia con el tamaño de la apuesta — es la parte del hallazgo que sí es confiable**, porque es una medida de calidad de la señal día a día, no del apalancamiento acumulado. Pero el retorno total en dólares depende enteramente de cuánto se esté dispuesto a arriesgar, y el titular de "+86%" asumía, sin decirlo explícitamente, apostar el 100% de la cuenta todos los días durante 14 meses seguidos — algo que ningún trader prudente haría. Con un tamaño de riesgo comparable al que ya usa el agente semanal (3% del capital), la ganancia de 14 meses baja a +1.9%: sigue siendo positiva y con buen Sharpe, pero está lejos del titular original. **Lectura correcta: la dirección de la señal es sólida (Sharpe ~4.5 estable a cualquier escala), pero "cuánto se gana" depende 100% de una decisión de gestión de riesgo que todavía no se ha tomado con criterio — no es una cifra que el backtest entregue solo.**
+Bruto, sin costos, la regla del cobre queda en Sharpe 0.78 con un IC95 que incluye holgadamente el cero — y Kelly **sin** cobre rinde lo mismo o más, así que ni siquiera ese resto es atribuible al cobre. El spread ida+vuelta que lleva la regla a retorno medio cero es **0.039%** del notional (antes de la corrección era 0.24%): cualquier spread realista de USD/CLP (0.10-0.20%) la hace perder. Sensibilidad (Umbral cobre, corregido): Sharpe 0.78 con spread 0, 0.38 con 0.02%, -0.23 con 0.05%, -1.24 con 0.10%, -2.25 con 0.15%, -3.26 con 0.20%.
 
-**Panel de 13 pares de forex** (`23_dataset_multi_par_diario.py`, dataset nuevo en `datos/bases/panel_fx_diario.csv`): CLP, MXN, BRL, COP, PEN, ZAR, CAD, AUD, NZD (economías commodity — cobre, petróleo, hierro, lácteos, oro) más JPY, CHF, EUR, GBP (no-commodity, grupo de comparación). Nota técnica: al descargar estos pares frescos desde yfinance apareció el mismo bug de ticks corruptos de un solo día ya documentado en `01_obtener_datos.py` para CLP=X (ej. un valor de "5.46" en vez de ~544) — apareció también en COP=X (22 días), PEN=X, ZAR=X y CHF=X, y se corrigió reusando la misma función `limpiar_ticks_erroneos`, no una nueva.
+**Sobre el tamaño de la apuesta**: la versión original separó dirección y tamaño (100%/20%/10%/3% del capital) para argumentar que el Sharpe ~4.5 era "la parte confiable". Con costos proporcionales al notional, el Sharpe neto también es invariante al tamaño — escalar no rescata nada: el problema no era el sizing, era la señal.
 
-![Correlación de cobre por par](../datos/resultados/panel_fx_correlacion_cobre_por_par.png)
+**Panel de 13 pares + NOK** (`60_panel_fx_corregido.py`, panel reconstruido con la misma receta de 23/55 pero alineado y sin precios repetidos: `datos/bases/panel_fx_diario_alineado.csv`).
 
-**El efecto generaliza, y de forma que confirma la teoría en vez de contradecirla**: las 3 monedas commodity más "puras" del panel (AUD, NZD, CAD — economías mineras/agrícolas clásicas) muestran la correlación **más fuerte** de las 13 (0.31 a 0.37, más alta que la propia CLP en 0.25), y USD/JPY (refugio, la menos "commodity" de todas) muestra la **más débil** (0.02) — el patrón se ordena casi exactamente como predice Chen & Rogoff (2003). Matices honestos: GBP/EUR (no-commodity) igual muestran correlación moderada (0.25/0.22) — probablemente un factor más amplio de "riesgo-on / debilidad del dólar" que el cobre también capta, no solo el canal específico de materias primas; y PEN (cobre, como CLP) sale sorprendentemente bajo (0.06) — posible efecto de que el Banco Central de Perú interviene el tipo de cambio activamente, amortiguando la respuesta diaria.
+| Par | Original "rezago +1" (reportado como predictivo) | **Corregido: rezago 0 (contemporáneo)** | **Corregido: rezago +1 (operable)** |
+|---|---|---|---|
+| AUD/USD | 0.375 | 0.377 | 0.006 |
+| NZD/USD | 0.315 | 0.316 | -0.000 |
+| USD/CAD | 0.313 | 0.314 | -0.011 |
+| USD/CLP | 0.255 | 0.256 | 0.080 |
+| USD/ZAR | 0.251 | 0.251 | -0.002 |
+| GBP/USD | 0.249 | 0.248 | 0.011 |
+| EUR/USD | 0.224 | 0.226 | 0.001 |
+| USD/NOK | 0.214 | 0.214 | -0.040 |
+| USD/BRL | 0.193 | 0.192 | -0.000 |
+| USD/CHF | 0.160 | 0.161 | -0.033 |
+| USD/COP | 0.151 | 0.152 | 0.014 |
+| USD/MXN | 0.116 | 0.116 | 0.001 |
+| USD/PEN | 0.058 | 0.054 | 0.005 |
+| USD/JPY | 0.021 | 0.025 | -0.012 |
 
-**¿Cuántas operaciones hace el backtest en cada par?** Se repitió el mismo backtest de Kelly diario (entrenado con la historia propia de cada moneda, sin pooling) para los 13 pares — la respuesta es **300 de 300 días de test en los 13 pares, sin excepción** (`panel_fx_backtest_por_par_metricas.csv`). No es que "opera casi siempre": con esta forma de calcular la posición, opera literalmente todos los días — nunca se queda plano, porque el `f*` de Kelly rara vez da exactamente cero. Eso llevó a encontrar el problema de apalancamiento que se corrige arriba: al revisar por qué **USD/PEN** daba un retorno de +860% (Sharpe 9.0, el "mejor" resultado del panel por lejos, a pesar de tener la correlación con cobre más débil de todo el grupo commodity) se confirmó que la posición estaba en el límite de apalancamiento el 97% de los días — el mismo problema que en CLP, solo que amplificado por la combinación particular de aciertos de dirección de PEN en este periodo. **Ese +860% no es un hallazgo real, es el mismo artefacto de apalancamiento máximo constante, no una oportunidad de PEN en particular.**
+(Convención del panel: USD por unidad de moneda extranjera, por eso el signo es positivo. `correccion_panel_fx_correlacion_cobre_por_par.csv`.)
 
-**¿Ayuda entrenar con el panel completo en vez de solo la historia de CLP?** Se probó, sobre el mismo test de CLP y el mismo esquema de walk-forward (5 reentrenos), un modelo entrenado únicamente con `copper_ret_1d`/`copper_mom_5d`/`retorno_1d`/`macd_rel`/`rsi_norm` de USD/CLP contra el mismo modelo entrenado con esas mismas features pero usando las filas de los **13 pares pooled** (más de 55.000 filas de entrenamiento vs. ~4.000):
+![Panel: la correlación "predictiva" era contemporánea](../datos/resultados/correccion_panel_fx_correlacion_cobre_por_par.png)
 
-| Estrategia | Retorno total | Sharpe anualizado |
-|---|---|---|
-| Kelly diario (solo CLP) | +83.0% | 4.42 |
-| Kelly diario (panel pooled, 13 pares) | +67.9% | 3.77 |
+El ordenamiento "Chen & Rogoff" que la versión original celebraba (AUD/NZD/CAD arriba, JPY abajo) **sigue siendo cierto — para la correlación contemporánea**: las monedas commodity se mueven con el cobre el mismo día, que es lo que predice la teoría. Pero la columna operable es prácticamente cero en los 14 pares; USD/CLP es la única con un resto visible (0.08). La regla "umbral cobre" con signo de train y spread por par pierde en los 14 pares (Sharpe neto de -0.01 en EUR/USD a -4.98 en USD/COP; bruto, todos con IC95 que incluye el cero salvo USD/PEN, significativamente negativo) — `correccion_panel_fx_backtest_por_par.csv`.
 
-![Curva de capital: pooled vs. solo CLP](../datos/resultados/panel_fx_pooled_vs_single_curva_capital.png)
+**Un segundo artefacto de datos, encontrado al revisar los números sospechosos del panel**: la variante "Kelly diario (con cobre)" da resultados positivos en varios pares emergentes (bruto: USD/BRL Sharpe 2.04, USD/COP 1.98, y **USD/PEN +1377% / Sharpe 10.8**, el mismo tipo de número absurdo que el "+860% de PEN" de la versión original). No viene del cobre: viene de `retorno_1d` en la regresión. Los precios diarios de Yahoo de pares poco líquidos tienen una autocorrelación de primer orden **negativa y espuria** — ruido en el precio que se revierte al día siguiente: PEN=X -0.44, COP=X -0.30, ZAR=X -0.23, CLP=X -0.18, BRL=X -0.15, contra ~0 en los pares líquidos (EUR, JPY, CAD: -0.03 a 0.01) y ~0 en las series de FRED de esas mismas monedas (BRL 0.01, ZAR 0.01, MXN 0.03). Una regla que "compra la caída de ayer" gana sobre esos precios porque los precios mismos son ruidosos, no porque se pueda operar a ellos. No se considera evidencia de edge, y a propósito no se exploró más (sería una configuración nueva elegida mirando el test). Es también lo que infla la validación histórica de Kelly en 2015-2016 (ver 9.17).
 
-(Mismo caveat de apalancamiento que arriba aplica a estos dos números — ambos están inflados por apostar ~100% del capital casi todos los días. La comparación *relativa* entre ambos sigue siendo válida porque el mismo sesgo afecta a los dos por igual.)
-
-**No ayudó — el modelo entrenado solo con CLP superó al pooled.** Tiene una explicación directa a la luz del gráfico anterior: la sensibilidad al cobre **varía bastante entre monedas** (0.02 a 0.37), así que agrupar todas las filas en una sola regresión "promedia" el coeficiente de CLP con el de monedas mucho más sensibles (AUD/CAD/NZD) y mucho menos sensibles (JPY) al cobre, diluyendo la calibración específica de CLP en vez de reforzarla. Es la segunda confirmación independiente (junto con la tesis de transfer learning EUR/USD→GBP/USD del radar-baseline, sección 9.11 del Artifact) de que sumar datos de otras monedas **no es una mejora automática** — hace falta un mecanismo más sofisticado que "pooling ingenuo" (ej. el contexto compartido vía cross-attention de X-Trend, que aprende a ponderar qué monedas son relevantes para cada una, en vez de promediar a todas por igual) para que más datos realmente ayuden.
+**¿Ayuda el panel pooled?** Con la alineación corregida (Kelly, 5 reentrenos, test de CLP): solo-CLP bruto +11.1% / Sharpe 0.79, neto -28.5% / -2.27; pooled (14 pares) bruto +18.9% / 1.26, neto -23.4% / -1.79; ambos con IC95 bruto que incluye el cero y posición saturada en ±1 el ~96% de los días (`correccion_panel_fx_pooled_vs_single.csv`). La conclusión original ("el pooling ingenuo empeora a CLP porque promedia sensibilidades al cobre distintas") ya no tiene sustento: no hay una sensibilidad operable al cobre que promediar, y la diferencia entre ambas variantes no es distinguible del ruido.
 
 ### 9.15 Decisiones pendientes (no tomadas en automático)
+
+> **Nota (2026-09-23)**: esta lista es el registro histórico de las decisiones de ese momento. Las premisas que la motivaban (timestamp limpio, Sharpe ~4.5 "confiable a cualquier escala") quedaron invalidadas — ver 9.13, 9.14 y la errata en 9.35. Los ítems marcados como hechos se hicieron, pero sus conclusiones fueron reemplazadas.
 
 Este tramo (9.11-9.14) mezcló trabajo sin supervisión directa (9.11-9.13, priorizando lo de menor costo/reversibilidad) con pasos pedidos explícitamente por Bastián después (9.14: validar el timestamp, probar rentabilidad, ampliar a un panel de 10+ pares). Lo que queda es de mayor alcance — construir algo nuevo, no solo investigar — y se deja explícito para que la decisión de invertir ahí sea de Bastián:
 
@@ -433,53 +433,50 @@ Este tramo (9.11-9.14) mezcló trabajo sin supervisión directa (9.11-9.13, prio
 
 Con esto se agotan las 12 candidatas de indicadores técnicos derivados del precio semanal de USD/CLP identificadas hasta ahora (7 originales + 5 de la ronda radar-baseline + estas 12 no se solapan, aunque MACD/RSI ya estaban en las 7 originales). Ninguna superó el umbral. Dado el paso 2 condicional de la Tarea ("si alguna supera 0.11, agregarla al PPO") no aplicó, no se entrenó ningún agente nuevo — se cierra la línea sin gasto de cómputo, mismo criterio de "barato antes de caro" que las secciones anteriores. La pista con mayor evidencia real sigue siendo la de 9.13/9.14 (cobre a frecuencia diaria, fuera del alcance semanal de esta línea).
 
-### 9.17 Issue #5: reconstrucción completa del agente de RL a frecuencia diaria
+### 9.17 Issue #5: reconstrucción completa del agente de RL a frecuencia diaria (resultados corregidos 2026-09-23)
 
-La sección 9.15 dejó una pregunta grande abierta: ¿vale la pena reconstruir el pipeline completo (dataset, entorno, agente) a frecuencia diaria para explotar `copper_ret_1d` (|r|=-0.256, más del doble de cualquier variable semanal), dado que el backtest de Kelly de 9.14 solo se había probado en el tramo reciente (2025-07 a 2026-09) del cobre? El Issue [#5](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/5) pidió, explícitamente, validar eso primero antes de comprometerse al trabajo caro.
+> **Errata**: la versión original reportaba que el agente PPO diario encontraba "la primera política rentable del proyecto" (+397.1%, Sharpe 3.88) y que la regla simple del cobre rendía aún más (+532.3%, Sharpe 4.39), con una validación histórica de Sharpe 2.07-5.42 en cuatro períodos. Los tres resultados heredaban el artefacto de timestamp y el bug de costos (9.35). Se rehízo todo con los datasets realineados (63), el entorno con spread ida+vuelta en cada operación y 3 semillas de PPO. La arquitectura del pipeline (dataset NHITS walk-forward con refit cada 5 días, entorno `27` separado del semanal, risk sizing de 3% del capital, TP/SL de un paso) se mantiene y su descripción sigue siendo válida; lo que cambia son los números y la conclusión.
 
-**Paso 1 — validación histórica (`25_validacion_historica_cobre_diario.py`)**: se repitió exactamente el mismo método de `22_kelly_diario_cobre.py` (Kelly condicional vía OLS + umbral simple, walk-forward de 5 ventanas × 60 días) en 3 periodos históricos adicionales, truncando el dataset diario a distintas fechas de corte en vez de reescribir la lógica de walk-forward (el truncamiento reutiliza `ventanas_walkforward()` sin cambios: el "final" de un dataframe truncado a una fecha vieja pasa a ser el periodo de test de esa época).
+La sección 9.15 dejó abierta la pregunta de si valía la pena reconstruir el pipeline completo a frecuencia diaria para explotar `copper_ret_1d`. El Issue [#5](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/5) pidió validar primero en períodos históricos.
 
-| Periodo | Test | Retorno total | Sharpe anualizado |
-|---|---|---|---|
-| 2015-2016 | 2015-11 a 2016-12 | +192.2% | **5.42** |
-| 2017-2018 | 2017-11 a 2018-12 | +63.6% | 3.25 |
-| 2020-2021 | 2020-11 a 2021-12 | +37.2% | 2.07 |
-| 2025-2026 (referencia, igual a 22) | 2025-07 a 2026-09 | +86.2% | 4.57 |
+**Paso 1 — validación histórica, corregida** (`59_senal_cobre_clp_corregida.py`; mismo método de 22/25 — Kelly condicional vía OLS y umbral simple de cobre, walk-forward 5 × 60 días, truncando el dataset a distintas fechas de corte — pero con la señal conocida antes de la entrada, el signo de la regla estimado solo con el train de cada ventana, y spread ida+vuelta de 0.15%):
 
-![Sharpe de la señal de cobre por periodo histórico](../datos/resultados/validacion_historica_cobre_diario_sharpe_por_periodo.png)
-
-**La señal se sostiene fuera del régimen alcista reciente del cobre — de hecho, la ventana más vieja (2015-2016) tiene el Sharpe más alto de las cuatro.** Ningún periodo da Sharpe negativo ni cercano a cero; el rango completo (2.07 a 5.42) está muy por encima del umbral que cualquier variable semanal logró superar en toda la investigación previa (9.5, 9.11-9.13, 9.16). Esto descarta que el hallazgo de 9.14 fuera específico de un régimen de cobre puntual, y respalda avanzar a la reconstrucción completa (paso 2).
-
-**Paso 2 — reconstrucción completa.** Antes de lanzar el walk-forward de NHITS a diario, se midió (no se asumió) el costo real: refit=True en cada día, igual que hace `10_generar_dataset_rl.py` semana a semana, se midió en ~8.9s/ventana — casi idéntico por ventana al semanal, pero con ~12× más puntos de decisión (4.346 días vs. 349 semanas), lo que habría tardado **~10.7 horas** sobre toda la historia. Se optó, en cambio, por una cadencia de refit cada 5 días hábiles (horizonte NHITS h=7 en vez de h=2), reutilizando cada fit para las 5 decisiones diarias siguientes — medido en ~9.8s/refit, cubriendo 5 días cada vez, es decir ~5× más barato por día cubierto. El costo real de generar 1.464 días de decisión (~5.8 años, 2020-12 a 2026-09) con esta cadencia fue de **~52 minutos** (`26_generar_dataset_rl_diario.py`), del mismo orden de magnitud que los ~58 minutos del dataset semanal. El trade-off explícito: dentro de cada bloque de 5 días, el forecast NHITS que ve el agente tiene hasta 4 días de antigüedad (no se recalibra contra el cierre de ayer, sino contra el de hasta 4 días atrás) — GARCH, MACD/RSI y las features de cobre sí se recalculan todos los días (son baratos, no generan el mismo problema de escala).
-
-**Entorno nuevo, no modificado el semanal**: `27_entorno_trading_rl_diario.py` es un archivo separado de `11_entorno_trading_rl.py` (que el Issue [#6](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/6), multi-activo FX, trabaja en paralelo sobre el mismo archivo semanal, en otra rama). Mismo `RIESGO_MAX_PCT`/mecanismo de risk sizing que el agente semanal — la corrección que 9.14/9.15 identificaron como necesaria (Kelly sin acotar saturaba el apalancamiento el 97% de los días) queda incorporada desde el diseño, no parcheada después. **Trailing stop repensado**: a una posición que se abre y resuelve entre un cierre y el siguiente no hay un segundo punto intradía para "trailear" (el stop necesita al menos 2 observaciones para moverse) — se simplifica, documentado explícitamente en el código, a un chequeo de take-profit/stop-loss de un solo paso contra el único precio disponible (el cierre de mañana).
-
-**Bug encontrado y corregido, con el mismo criterio de "verificar antes de reportar" que BUG #3 (ver bitácora del proyecto)**: la primera corrida del backtest final dio un resultado catastrófico y sospechoso para "Umbral cobre" (-99.75%, Sharpe -8.26) — exactamente el tipo de número que amerita desconfiar antes de creerlo. La causa: `calcular_salida_dia()` usaba el forecast NHITS (`nhits_h1`) como precio de take-profit sin verificar que estuviera del lado *ganador* de la posición. Para estrategias cuya dirección viene del propio NHITS (el agente semanal, y "Umbral simple" en este mismo script) el take-profit siempre cae del lado correcto por construcción — pero "Umbral cobre" elige dirección según `copper_ret_1d`, una señal sin relación con hacia dónde apunta NHITS, así que el "take profit" podía terminar en el lado perdedor. Confirmado en los datos: 170 de 300 cierres etiquetados "take_profit" tenían PnL promedio **negativo** (-96.2 de los -99.75 puntos totales de pérdida). Corregido: el take-profit solo dispara si de verdad está del lado favorable de la posición; si no, se ignora y solo quedan stop-loss/cierre de día como salida. Como esto también pudo afectar el propio entrenamiento del PPO (el agente puede elegir direcciones que no coincidan con NHITS), se reentrenó el agente completo con el entorno corregido antes de reportar nada.
-
-**Backtest final walk-forward** (`28_backtest_walkforward_diario.py`, mismo esquema que `14_backtest_walkforward_gestion_riesgo.py`: 5 ventanas × 60 días de test, 300 días out-of-sample, 2025-06 a 2026-09, PPO reentrenado en cada ventana):
-
-| Estrategia | Retorno total | Sharpe anualizado | Max drawdown | Win rate | Operaciones |
+| Período de test | Original: Kelly con cobre (Sharpe) | Corregido: Umbral cobre, bruto [IC95] | **Corregido: Umbral cobre, neto** | Corregido: Kelly con cobre, bruto | **Corregido: Kelly con cobre, neto** |
 |---|---|---|---|---|---|
-| **Umbral cobre** | **+532.3%** | **4.39** | -13.5% | 60.0% | 290 |
-| **PPO (RL diario)** | **+397.1%** | **3.88** | -8.8% | 58.9% | 299 |
-| Umbral simple (forecast) | +22.9% | 0.83 | -24.0% | 51.1% | 133 |
-| Buy-and-hold | -1.2% | -0.02 | -13.2% | 50.0% | — |
+| 2015-11 a 2016-12 | 5.42 | 0.99 [-0.80, 2.72] | **-1.06** | 5.48 [3.43, 7.39] | **3.35** [1.17, 5.33] |
+| 2017-11 a 2018-12 | 3.25 | 0.80 [-1.13, 2.66] | **-1.99** | 1.22 [-0.28, 2.74] | **-1.51** |
+| 2020-11 a 2021-12 | 2.07 | 2.54 [0.41, 4.57] | **-0.27** [-2.60, 1.93] | 0.91 [-1.00, 2.74] | **-1.90** |
+| 2025-07 a 2026-09 | 4.57 | 0.78 [-0.78, 2.42] | **-2.25** | 0.69 [-0.87, 2.25] | **-2.43** |
 
-![Curva de capital: backtest walk-forward diario](../datos/resultados/walkforward_diario_curva_capital.png)
-![Puntos de entrada/salida del agente PPO diario](../datos/resultados/walkforward_diario_puntos_entrada_salida.png)
+(`correccion_clp_cobre_validacion_historica.csv`.)
 
-**A diferencia de la versión semanal (9.4, 9.9, 9.12), el agente PPO diario SÍ encuentra una política rentable** — con gestión de riesgo real (3% de capital arriesgado por operación, TP/SL, slippage), no una simplificación. Verificación post-fix antes de reportar (mismo criterio que arriba): la razón de cierre "take_profit" ahora tiene PnL promedio positivo en ambas estrategias apalancadas (+2.63 en Umbral cobre, +3.22 en PPO), "stop_loss" negativo como corresponde, y la curva de capital compone gradualmente a lo largo de los 300 días sin saltos discontinuos ni una sola operación explicando el resultado — no es un artefacto de un día con suerte.
+Con costos, la regla del cobre pierde en los cuatro períodos. Hay dos positivos que hay que mirar con el mismo estándar de sospecha que se aplicaba a los negativos:
+- **Umbral cobre bruto 2020-2021** (Sharpe 2.54, IC95 que excluye el cero): es el período donde el resto de correlación operable de USD/CLP con el cobre es más alto (-0.11 en 2020-2022). Es 1 de 12 celdas brutas de la tabla, sin corrección por pruebas múltiples, y con el spread supuesto queda en -0.27.
+- **Kelly 2015-2016** (bruto 5.48, neto 3.35): no viene del cobre. Kelly **sin** cobre en ese mismo período da bruto 3.60 / neto 1.53, y la correlación del cobre en esa ventana es chica. Lo que explota la regresión es `retorno_1d`: en 2015-2016 el retorno diario de `CLP=X` en Yahoo tiene autocorrelación de primer orden de -0.26 (-0.18 en toda la muestra), ruido de cotización que se revierte al día siguiente (9.35.6) y que una serie operable no tiene. No se toma como evidencia de edge.
 
-**Lectura honesta de la comparación PPO vs. Umbral cobre**: la señal simple (solo el signo de `copper_ret_1d`) le gana al agente entrenado — +532% contra +397%. El PPO no ignora la señal (coincide en dirección con "Umbral cobre" el 72.3% de los días, no una política degenerada ni una copia ciega), pero el ~28% de los días donde diverge — presumiblemente combinando otras variables del estado (NHITS, MACD, RSI, volatilidad) — le resta más de lo que le suma. Es un resultado consistente con lo ya visto en 9.14 (el umbral simple sin regresión rendía casi igual que Kelly condicional): cuando una sola variable concentra la mayor parte de la señal explotable, agregar más complejidad no garantiza mejorar sobre usarla directamente.
+La conclusión original ("la señal se sostiene fuera del régimen reciente, respalda avanzar al paso 2") no se sostiene: con la alineación correcta no había una señal del cobre que validar.
 
-**Limitaciones de esta reconstrucción, dichas sin atenuar**:
-- **Staleness del forecast NHITS**: hasta 4 días de antigüedad dentro de cada bloque de refit de 5 días (ver arriba) — un trade-off de cómputo explícito, no gratis. `vol_garch`, MACD/RSI y las features de cobre sí son frescos cada día.
-- **Un solo periodo de test para el backtest final**: las 300 días de walk-forward (2025-06 a 2026-09) caen dentro del mismo tramo alcista reciente del cobre que el paso 1 ya identificó como el de Sharpe más bajo (2.07-4.57) de los cuatro periodos históricos — el paso 1 usó el método más simple (Kelly/umbral) para cubrir más historia; repetir el backtest completo (dataset NHITS + PPO) en 2015-2016 o 2017-2018 queda pendiente si se quiere la misma confianza sobre la versión final con gestión de riesgo real y PPO.
-- **Sin comisión** (solo slippage 0.05%, igual que el resto del proyecto) — con 290-299 operaciones en 300 días, una comisión realista (aunque baja) le pega más a las estrategias activas que al buy-and-hold.
-- **Retornos muy altos en términos absolutos** (+397% a +532% en 14 meses): se verificaron activamente antes de reportar (ver el bug encontrado y corregido arriba, y la inspección de PnL por razón de cierre) y el Sharpe (~4) es consistente con el validado en 4 periodos históricos independientes en el paso 1 — pero un track record de 300 días, por más prolijo que sea el walk-forward, sigue siendo corto frente a los 16 años de historia completa del dataset.
-- **`Umbral simple (forecast)` no es un tercer punto de comparación limpio para el hallazgo del cobre**: usa el forecast NHITS (staleness de hasta 4 días) para dirección, no `copper_ret_1d` — se mantiene en la tabla por paralelismo con `14`, no porque sea la comparación más relevante para esta sección.
+**Paso 2 — reconstrucción completa, reentrenada sobre datos alineados.** El dataset NHITS de 26 se **realineó** en vez de regenerarse (`63_realinear_datasets_rl_diarios.py`, justificación en 9.35.1: NHITS, GARCH y los indicadores técnicos solo usan la serie FX hasta el precio de la fila; solo las columnas de cobre estaban mal alineadas). El chequeo de cordura sobre el propio dataset (1.454 días, 2020-12 a 2026-09): la correlación de `copper_ret_1d` con el retorno que se operaba pasa de -0.237 (original) a -0.103 (operable corregido), y la contemporánea queda en -0.219. El entorno `27` cobra ahora el spread ida+vuelta (0.15%) sobre el notional en cada operación, también durante el entrenamiento, así que el agente aprende con la economía real. PPO se reentrena en cada ventana (5 × 60 días, 100k timesteps) con 3 semillas (`64_entrenar_ppo_diario_corregido.py`, lote A); los baselines usan solo información de train: signo de la regla del cobre estimado en train (dio -1 en las 5 ventanas) y umbral de "Umbral simple" = mediana de |forecast| del train (la versión original usaba la mediana de todo el dataset, test incluido). Métricas en `65_resumen_rl_diario_corregido.py`.
 
-**Decisión de scope**: se avanzó directo del paso 1 al paso 2 completo (dataset, entorno, agente, backtest) en la misma sesión, sin pausar a pedir aprobación intermedia — la validación histórica del paso 1 no mostró ninguna señal de alarma (ningún Sharpe negativo o cercano a cero) que ameritara frenar antes de comprometerse al trabajo caro, criterio ya establecido en la Tarea de origen de este Issue.
+| Estrategia (300 días, 2025-06 a 2026-09) | Original | **Corregido, neto (spread 0.15%)** [IC95] | Corregido, bruto [IC95] | Operaciones | Apalancamiento mediano |
+|---|---|---|---|---|---|
+| PPO (RL diario), 3 semillas | +397.1% / Sharpe 3.88 | **-5% a -23% / Sharpe -0.90, -1.61, -2.14** (media -1.55) | Sharpe 0.10, -0.53, -0.83 | 8, 13, 24 | 4.6x |
+| Umbral cobre | +532.3% / 4.39 | **-65.5% / -2.37** [-4.07, -0.73] | +1.66 [0.12, 3.23] | 290 | 3.8x |
+| Umbral cobre, salida al cierre (sin TP/SL) | — | -70.0% / -1.99 [-3.43, -0.54] | +1.12 [-0.33, 2.62] | 290 | 3.8x |
+| Umbral simple (forecast NHITS) | +22.9% / 0.83 | -30.5% / -1.11 [-3.46, 1.12] | +1.35 [-0.84, 3.39] | 133 | 3.5x |
+| Buy-and-hold (sin apalancar) | -1.2% / -0.02 | -0.0% / 0.06 [-1.35, 1.40] | — | — | 1x |
+| *Control: dirección al azar, mismo simulador (300 sorteos)* | — | — | *media +0.50 (p5 -0.99, p95 +2.11)* | 300 | 3.8x |
+
+(`correccion_rl_metricas_todas.csv`, sensibilidad a spread en `correccion_rl_sensibilidad_spread.csv`.)
+
+![USD/CLP diario corregido](../datos/resultados/correccion_rl_diario_clp_curva_capital.png)
+
+**Lectura corregida**:
+1. **El agente PPO, entrenado con los costos reales, aprende a casi no operar** (8 a 24 operaciones en 300 días según la semilla, contra 299 en la versión original) — el mismo atractor de "no operar" que el agente semanal (9.4, 9.9) y por la misma razón: no hay señal que pague el costo. Las pocas operaciones que hace pierden (Sharpe neto -0.9 a -2.1; bruto entre -0.8 y +0.1). La coincidencia de dirección con la regla del cobre, que en la versión original era 72.3%, deja de tener sentido con tan pocas operaciones (54-88%).
+2. **La regla del cobre pierde dos tercios del capital con costos**: con un apalancamiento de 3.8x, un spread de 0.15% por operación equivale a ~0.57% del capital por día. Su spread de breakeven es 0.06% del notional.
+3. **Un sesgo del simulador que la versión original no medía** (auditoría `stops.py`): el TP/SL de un paso solo dispara si el **cierre** cruza el nivel. Un stop que el precio tocó durante el día y del que volvió no se ejecuta (optimista); un TP tocado que se devolvió no se cobra (pesimista). El neto es un sesgo a favor: con dirección **al azar**, el mismo simulador da Sharpe bruto medio de +0.50 en CLP (+0.40 en AUD, +0.25 en CAD), contra ~0.0 si se sale siempre al cierre. Parte de los Sharpe brutos positivos de esta sección y de 9.20-9.28 es ese sesgo, no señal.
+
+**Limitaciones que siguen, dichas sin atenuar**: el forecast NHITS sigue teniendo hasta 4 días de antigüedad dentro de cada bloque (trade-off de cómputo documentado en 26); un único período de test de 300 días; 3 semillas (no 5) por cómputo; y el TP/SL con precios de cierre, descrito arriba, sigue siendo una aproximación sesgada a favor que no se corrigió (no hay datos intradía de CLP de calidad suficiente para hacerlo) — por eso cada tabla trae la variante sin TP/SL o el control al azar.
 
 ### 9.18 Issue #6: ¿el atractor de "no operar nunca" es especifico de USD/CLP o generico? (multi-activo FX)
 
@@ -523,6 +520,8 @@ GARCH(1,1) repite como ganador en MXN y BRL, consistente con CLP (seccion 9.2) �
 
 **0 operaciones en las 20/20 evaluaciones.** Esto responde directamente la pregunta que motivo el Issue #6: el atractor de "no operar nunca" **no es un artefacto especifico de USD/CLP** — la misma politica, entrenada con mas diversidad de regimenes de mercado (4 monedas en vez de 1) y con capacidad explicita de condicionar su comportamiento por moneda, tampoco encuentra una razon para operar en USD/MXN, USD/BRL ni USD/COP. Es evidencia consistente con el diagnostico acumulado de las secciones 9.5/9.9/9.11/9.12: el cuello de botella es la falta de señal explotable con estas features a frecuencia semanal, no un problema de "pocos datos de un solo activo" ni del diseno del agente — mas datos de mas monedas, sin mas señal real detras, no le dan al agente ninguna palanca nueva para encontrar una politica rentable.
 
+*(Nota 2026-09-23: el resultado semanal de esta sección no está afectado por la errata de 9.35, pero la comparación de este párrafo con 9.14 usa números de 9.14 que quedaron invalidados — con la alineación corregida, pooled y solo-CLP son indistinguibles del ruido y ambos pierden con costos; ver 9.14. La lección de fondo, "más datos de otras monedas no crea una señal que no existe", queda reforzada.)*
+
 **¿Confirma o contradice el hallazgo de pooling de la seccion 9.14?** Ni una cosa ni la otra de forma directa — lo matiza. La seccion 9.14 encontro que un pooling **ciego** (OLS sin poder condicionar por moneda) empeoraba el resultado especifico de CLP (+67.9% pooled vs. +83.0% solo-CLP) porque promediaba coeficientes de monedas con sensibilidad al cobre muy distinta. Aca, el diseno evito deliberadamente ese mecanismo (one-hot condicionante en vez de pooling ciego) — y el resultado para CLP fue **identico**, no peor, al entrenamiento solo-CLP. Es decir: cuando se evita el mecanismo especifico que perjudico a CLP en 9.14 (el promedio ciego), sumar datos de otras monedas deja de ser perjudicial — pero tampoco es util, porque no hay señal real que extraer de ninguna de las 4 series a esta frecuencia. Las dos secciones son consistentes con la misma leccion de fondo: **"mas datos de otras monedas" no es una mejora automatica ni un perjuicio automatico — depende de si hay señal real detras, y en ninguno de los dos experimentos (9.14 a diario con cobre, 9.18 a semanal con las 7 features originales) el pooling por si solo genero una señal que no existia antes.**
 
 **Limitaciones de este experimento**: presupuesto de entrenamiento igual al agente solo-CLP (no 4×) fue una decision de diseno explicita (ver arriba), pero significa que el agente multi-activo vio en promedio ~25k pasos "de CLP" por ventana contra 100k del agente solo-CLP — no se descarta que un presupuesto 4× mayor (400k timesteps/ventana) cambie el resultado, aunque dado que ambos convergen al mismo punto fijo exacto con presupuestos muy distintos de exposicion a CLP especificamente, es poco probable. Una sola arquitectura (MLP de stable-baselines3, sin capas compartidas explicitas ni embeddings aprendidos del par-id mas alla del one-hot) y una sola semilla (42, consistente con el resto del proyecto). El muestreo de pares durante el entrenamiento es uniforme (25% cada uno) — no se probo un muestreo ponderado por volumen/liquidez ni curriculum learning.
@@ -536,52 +535,33 @@ GARCH(1,1) repite como ganador en MXN y BRL, consistente con CLP (seccion 9.2) �
 - [ ] Decidir si vale la pena un experimento con presupuesto de entrenamiento 4× (400k timesteps/ventana) para descartar del todo que sea un problema de exposicion insuficiente a CLP, dado lo poco probable que cambie algo segun el patron de esta seccion.
 - [ ] Cerrar la Tarea de Notion "Entrenar agente de RL con datos multi-activo" con este hallazgo documentado.
 
-### 9.20 Issue #9: ¿operar varios días reduce la divergencia del agente con la señal del cobre? (holding fijo de N días)
+### 9.20 Issue #9: ¿operar varios días reduce la divergencia del agente con la señal del cobre? (holding fijo de N días — resultados corregidos 2026-09-23)
 
-El Issue [#9](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/9) — motivado por una pregunta de Bastián sobre por qué el agente diario (9.17) entra y sale de cada posición en 24 horas — partió de una limitación de diseño explícita de `27_entorno_trading_rl_diario.py`: cada posición se abre al cierre de hoy y se resuelve contra el único precio disponible (el cierre de mañana), así que el trailing stop real (el mismo mecanismo que sí usa el agente semanal, 9.3) nunca tiene un segundo punto de precio para moverse a favor. La pregunta central: si se deja que una posición dure N días en vez de 1, ¿el agente se acerca más a la señal simple del cobre que ya lo supera (72.3% de coincidencia de dirección, 9.17), o se aleja?
+> **Errata**: la versión original concluía que alargar el holding alejaba al PPO de la señal del cobre (razón Sharpe PPO/cobre 0.88 → 0.51 para N=1 → 5), con Sharpe de 1.1 a 4.4 en todas las variantes. Esos niveles heredaban el artefacto de timestamp y el bug de costos (9.35); la pregunta misma ("acercarse a la señal del cobre") quedó sin objeto porque esa señal no es operable. Se reentrenó con datos alineados, costos ida+vuelta y 3 semillas.
 
-**Enfoque elegido (Propuesta A de las 3 discutidas en el Issue, la más barata)**: horizonte de holding **fijo** de N días — el dataset diario se recorre en bloques no solapados de N filas (decisión en el día 0, posición resuelta contra los días 1..N, siguiente decisión en el día N+1), reutilizando el mecanismo de trailing stop del agente semanal (`ejecutar_operacion()` de `11_entorno_trading_rl.py`) sobre esos N precios en vez de sobre los ~5 días hábiles de una semana calendario. El punto de decisión sigue siendo diario en el sentido de que el estado (incluyendo `copper_ret_1d` fresco) se lee el mismo día de la entrada — lo que cambia es cuántos días pasan hasta la siguiente decisión.
+El Issue [#9](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/9) partió de una limitación de diseño de `27_entorno_trading_rl_diario.py`: cada posición se resuelve contra el cierre siguiente, así que el trailing stop real del agente semanal nunca tiene un segundo precio para moverse. **Enfoque (Propuesta A, sin cambios)**: holding fijo de N días en bloques no solapados, reutilizando el trailing stop del agente semanal combinado con la corrección de take-profit inválido del agente diario (`ejecutar_operacion_multidia()` en `32_entorno_trading_rl_diario_multidia.py`; el bug que encontró el smoke-test original — reusar `ejecutar_operacion()` de 11 sin esa corrección — sigue corregido). El entorno `32` cobra ahora el spread ida+vuelta sobre el notional en cada decisión (cada bloque de N días es una operación completa).
 
-**Bug encontrado antes de entrenar nada, mismo patrón que 9.17**: la primera versión de `32_entorno_trading_rl_diario_multidia.py` reusaba `ejecutar_operacion()` de `11_entorno_trading_rl.py` tal cual. El smoke-test (que compara `dias_holding=1` contra el entorno diario original, fila por fila, antes de gastar cómputo de entrenamiento) encontró una diferencia de hasta 91.7 puntos de precio de salida — la causa: esa función del agente semanal **no tiene** la corrección de take-profit inválido que 9.17 ya había encontrado y corregido para el caso diario (un `take_profit=nhits_h1` puede caer del lado perdedor de una posición cuya dirección no vino del propio forecast de NHITS). El agente semanal nunca necesitó esa corrección porque siempre elige dirección según el signo de `nhits_h1 - entrada`; acá, igual que en 27, el TP/SL se precomputa para largo y corto sin condicionar en el forecast, así que el mismo bug podía reaparecer. Se escribió `ejecutar_operacion_multidia()`, que combina el trailing stop real (de 11) con la corrección de TP inválido (de 27) — verificado que con `dias_holding=1` reproduce el resultado de 9.17 al centavo (mismo capital final, mismo Sharpe, confirmado explícitamente en el smoke-test antes de correr nada más).
+**Walk-forward corregido** (`64_entrenar_ppo_diario_corregido.py` lote B + `65_resumen_rl_diario_corregido.py`; dataset realineado de 63, 5 ventanas × 60 filas diarias, 100k timesteps, semillas 42/7/123; N=1 es el agente de 9.17; Sharpe anualizado con `sqrt(252/N)`):
 
-**Walk-forward** (`33_backtest_walkforward_diario_multidia.py`, mismo esquema de 5 ventanas × 60 días de calendario que 9.17, PPO reentrenado en cada ventana con el mismo presupuesto de 100k timesteps, para `dias_holding` ∈ {1, 2, 3, 5} — N=1 se reentrenó con el código nuevo, no se reusó el resultado de 9.17, y reprodujo esos números exactos como verificación adicional de consistencia):
+| Holding | Original: PPO / Umbral cobre (Sharpe) | **Corregido: PPO neto, 3 semillas** (Sharpe) | Operaciones PPO | Corregido: Umbral cobre neto [IC95] / bruto | *Control: dirección al azar, bruto (media; p5-p95)* |
+|---|---|---|---|---|---|
+| 1 día (300 decisiones) | 3.88 / 4.39 | **-0.90, -1.61, -2.14** | 8-24 | -2.37 [-4.07, -0.73] / 1.66 | *0.50 (-0.99; 2.11)* |
+| 2 días (150) | 2.87 / 3.31 | **0.01, -1.40, 1.28** | 2-7 | -0.53 [-2.06, 0.79] / 1.62 | *1.23 (-0.22; 2.59)* |
+| 3 días (100) | 1.13 / 1.59 | **-0.33, -1.16, -0.59** | 87-92 | 0.73 [-1.73, 2.58] / 2.11 | *1.12 (-0.37; 2.38)* |
+| 5 días (60) | 1.31 / 2.59 | **0.74, 0.87, 0.74** [-1.06, 2.31] | 58-60 | -0.40 [-3.28, 1.60] / 0.69 | *0.81 (-0.57; 1.99)* |
 
-| Holding | Estrategia | Decisiones | Retorno total | Sharpe anualizado | Max drawdown | Operaciones |
-|---|---|---|---|---|---|---|
-| 1 día | **Umbral cobre** | 300 | +532.3% | **4.39** | -13.5% | 290 |
-| 1 día | **PPO** | 300 | +397.1% | 3.88 | -8.8% | 299 |
-| 2 días | Umbral cobre | 150 | +225.1% | 3.31 | -19.7% | 146 |
-| 2 días | PPO | 150 | +175.2% | 2.87 | -10.9% | 150 |
-| 3 días | Umbral cobre | 100 | +63.8% | 1.59 | -16.6% | 96 |
-| 3 días | PPO | 100 | +38.2% | 1.13 | -13.2% | 100 |
-| 5 días | Umbral cobre | 60 | +113.7% | 2.59 | -8.3% | 60 |
-| 5 días | PPO | 60 | +49.0% | 1.31 | -18.6% | 60 |
-| — | Buy-and-hold (referencia) | 300 | -1.2% | -0.02 | -13.2% | 300 |
+(Tabla completa con retornos, drawdown, IC95 por semilla y coincidencia de dirección en `correccion_rl_metricas_todas.csv`.)
 
-*Nota de anualización*: con `dias_holding>1` cada observación de retorno cubre N días de calendario, no 1 — el Sharpe se anualiza con `sqrt(252/dias_holding)` en vez del `sqrt(252)` fijo de 9.17 (que asumía observaciones diarias), para que los cuatro valores de N sean comparables entre sí. Verificado que con `dias_holding=1` esto colapsa exactamente al mismo cálculo de 9.17.
+**Lectura corregida**:
+1. **El simulador multi-día tiene un sesgo a favor aún mayor que el de un paso**: con dirección elegida **al azar**, el mismo mecanismo de trailing stop + TP evaluado con precios de cierre da Sharpe bruto medio de 0.8 a 1.2. Ningún Sharpe bruto de esta tabla (PPO 1.7-1.8 en N=5, Umbral cobre 0.7-2.1) sale de la banda p5-p95 del azar. Los Sharpe positivos de la versión original en N≥2 tenían, además del artefacto de timestamp, este piso inflado.
+2. **Neto de costos, ninguna configuración es distinguible de cero**. El caso con mejor número, PPO con N=5 (Sharpe neto 0.74-0.87 en las tres semillas, +24% a +29% en 60 decisiones), tiene IC95 [-1.06, 2.31], un bruto (1.70-1.81) dentro de la banda del control al azar (p95 = 1.99), y dos de las tres semillas convergieron a exactamente la misma política. Con 4 valores de N × 3 semillas, un máximo de ese tamaño es lo esperable por azar (E[máx. Sharpe] bajo H0 para 12 configuraciones con 60 decisiones ≈ 1.5).
+3. **La hipótesis original del Issue queda sin objeto**: la "coincidencia de dirección con el cobre" que se medía (72.6% → 61.7%) comparaba al agente con una señal que no es operable. Con los datos corregidos, el agente de N=1-2 casi no opera (2-24 operaciones en 300 días) y en N=3-5 coincide con la regla del cobre 53-70% de las veces, sin que ninguna de las dos gane.
 
-![Curva de capital: holding de N días vs. buy-and-hold](../datos/resultados/walkforward_diario_multidia_curva_capital.png)
-
-**Coincidencia de dirección PPO vs. Umbral cobre, por N** (misma definición que el 72.3% de 9.17: % de días donde el PPO operó y coincidió en signo con la señal del cobre ese mismo día de entrada, promedio ponderado por días operados en las 5 ventanas):
-
-| Holding | Coincidencia de dirección |
-|---|---|
-| 1 día | 72.6% |
-| 2 días | 72.7% |
-| 3 días | 68.0% |
-| 5 días | 61.7% |
-
-**Respuesta a la pregunta del Issue: alargar el holding NO reduce la divergencia con el cobre — la aumenta.** La coincidencia de dirección baja de forma consistente de 72.6% (N=1) a 61.7% (N=5): el ~27-28% de días donde el PPO ya divergía de la señal simple en 9.17 se convierte en ~38% al forzar posiciones de 5 días. La razón entre el Sharpe del PPO y el de Umbral cobre a cada N cuenta la misma historia con más claridad, porque no depende de cuántas decisiones caben en la ventana (N=1: 3.88/4.39=0.88; N=2: 2.87/3.31=0.87; N=3: 1.13/1.59=0.71; N=5: 1.31/2.59=0.51) — el PPO se aleja relativamente del baseline simple a medida que crece N, en vez de acercarse. Extender el holding no le da al agente más margen para "convencerse" de la señal del cobre; le da más margen para que las otras variables del estado (NHITS, MACD, RSI, volatilidad) lo saquen de esa dirección durante más días seguidos.
-
-**La hipótesis de la Propuesta A queda rechazada por la evidencia, no confirmada** — es el mismo tipo de resultado honesto que ya dejó 9.4/9.9/9.12/9.18: no todas las extensiones razonables mejoran el resultado, y reportarlo así es más útil que forzar una lectura optimista.
-
-**Limitaciones, dichas sin atenuar**:
-- **Tamaño de muestra decreciente con N**: 300 decisiones en N=1 baja a solo 60 en N=5 (12 por ventana) — los Sharpe de N=3 y N=5 individualmente son ruidosos (el propio Sharpe de Umbral cobre sube de 1.59 en N=3 a 2.59 en N=5, no un patrón monótono en el nivel absoluto). El patrón que sí es robusto al ruido de muestra chica es el de la **razón** PPO/cobre, que cae de forma monótona en los 4 valores de N — es la comparación relativa, no los niveles absolutos de Sharpe a N grande, la que sostiene la conclusión de esta sección.
-- **Solo 4 valores de N probados** (1, 2, 3, 5) — no se barrió N=4 ni N>5; dado que el patrón ya es monótono y consistente en los 4 puntos disponibles, no se priorizó ampliar la grilla.
-- **Un solo periodo de test** (2025-06 a 2026-09, igual que 9.17) y una sola semilla (42) — mismas limitaciones ya declaradas en 9.17, no resueltas acá.
-- **No se probaron las Propuestas B (el agente decide todos los días si mantener/cerrar, acción "hold") ni C (acción continua con duración implícita)** discutidas en el Issue — la evidencia de la Propuesta A (más barata) no muestra ninguna mejora que justifique el costo mayor de rediseñar el entorno para B o C; queda como decisión pendiente si en el futuro se quiere probar un mecanismo de duración *adaptativa* en vez de fija, que es una pregunta distinta a la que responde esta sección.
+**Limitaciones**: el trailing stop/TP con precios de cierre sigue siendo una aproximación sesgada a favor (el control al azar la cuantifica pero no la corrige); tamaño de muestra decreciente con N (60 decisiones en N=5); un único período de test.
 
 ### 9.21 Tareas pendientes en el Issue #9
+
+> Nota (2026-09-23): registro histórico; los resultados que respondían estas tareas se rehicieron en 9.20 corregida (ver 9.35).
 
 - [x] Implementar el entorno de holding fijo de N días, reusando el trailing stop del agente semanal con la corrección de take-profit del agente diario (`32_entorno_trading_rl_diario_multidia.py`).
 - [x] Verificar por smoke-test que `dias_holding=1` reproduce exactamente el resultado de 9.17 antes de gastar cómputo de entrenamiento.
@@ -594,75 +574,66 @@ El Issue [#9](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issu
 
 Idea de Bastián, fuera de Issue: ¿el cierre/apertura/mínimo/máximo de la semana calendario anterior le dan al agente diario información de "tendencia semanal" que las features actuales (basadas en ventanas de días, no semanas) no capturan? Se validó con el mismo método de correlación de 19/21/24, sin tocar el agente (`34_features_semanales_validacion.py`).
 
-En la muestra completa (2010-2026), dos de las seis features propuestas superan el umbral |r|=0.11 (`sem_ant_cierre_rel`=0.141, `sem_ant_min_rel`=0.121) — el primer caso en todo el proyecto donde una feature derivada *puramente* del propio precio de USD/CLP lo logra. Pero un chequeo de estabilidad por mitades de la muestra (mismo criterio que "verificar antes de reportar") lo desinfla: `sem_ant_cierre_rel` pasa de r=0.204 (2010-2018) a r=0.088 (2018-2026) — el efecto se debilita a menos de la mitad, y en el tramo más reciente (el que más importa para operar hoy) ya no supera el umbral. En contraste, `copper_ret_1d` es estable entre mitades (-0.259 vs. -0.254). Las dos features candidatas están además correlacionadas entre sí en 0.75 — no son señales independientes. **Conclusión: parece un efecto de régimen que se está apagando, no una señal explotable como la del cobre — no se agregó al estado del agente.**
+En la muestra completa (2010-2026), dos de las seis features propuestas superan el umbral |r|=0.11 (`sem_ant_cierre_rel`=0.141, `sem_ant_min_rel`=0.121) — el primer caso en todo el proyecto donde una feature derivada *puramente* del propio precio de USD/CLP lo logra. Pero un chequeo de estabilidad por mitades de la muestra (mismo criterio que "verificar antes de reportar") lo desinfla: `sem_ant_cierre_rel` pasa de r=0.204 (2010-2018) a r=0.088 (2018-2026) — el efecto se debilita a menos de la mitad, y en el tramo más reciente (el que más importa para operar hoy) ya no supera el umbral. En contraste, `copper_ret_1d` es estable entre mitades (-0.259 vs. -0.254 en la versión original; **corrección 2026-09-23**: ese contraste usaba la correlación contaminada por el artefacto de timestamp de 9.35 — con la alineación corregida, la correlación operable del cobre es -0.068 en 2010-2017 y -0.086 en 2018-2026, estable pero chica y bajo el umbral, `correccion_clp_features_diarias_913.csv`; las features de la semana anterior dependen solo del precio de USD/CLP y no están afectadas por el artefacto, así que la conclusión de esta sección — descartarlas — no cambia). Las dos features candidatas están además correlacionadas entre sí en 0.75 — no son señales independientes. **Conclusión: parece un efecto de régimen que se está apagando, no una señal explotable como la del cobre — no se agregó al estado del agente.**
 
-### 9.23 Take-profit adaptativo: ¿elegir entre h1/h2/h3 según consistencia del forecast mejora sobre h1 fijo?
+### 9.23 Take-profit adaptativo: ¿elegir entre h1/h2/h3 según consistencia del forecast mejora sobre h1 fijo? (resultados corregidos 2026-09-23)
 
-El Issue #9 (9.20) dejó fija la mecánica de salida en `take_profit = nhits_h1` para cualquier duración de holding. Idea de Bastián: en vez de un objetivo fijo, dejar que la propia trayectoria del forecast de NHITS (h1→h2→h3) decida qué tan lejos apuntar — si el movimiento se sostiene en la misma dirección y la distancia a la entrada crece paso a paso, usar el horizonte más lejano consistente; si se estanca, quedarse en h1 (mismo comportamiento de siempre). Implementado en `36_entorno_trading_rl_diario_tp_adaptativo.py`, reusando por composición `construir_decisiones_multidia()` y `ejecutar_operacion_multidia()` de 32 — holding fijo en 3 días (el horizonte más lejano que la regla puede elegir).
+> **Errata**: la versión original reportaba Umbral cobre +266.1% / Sharpe 3.73, PPO con TP=h1 +90.1% / 2.13 y PPO con TP adaptativo +88.7% / 2.04, y un desglose en el que las operaciones "consistentes hasta h3" concentraban +$100.90. Los niveles heredaban el artefacto de timestamp y el bug de costos (9.35). Se reentrenó con el dataset h3 realineado, costos y 3 semillas.
 
-**Nota metodológica importante, encontrada en el camino**: NHITS no tiene semilla fija en este pipeline. Para tener `nhits_h3` hubo que regenerar el dataset diario (`35_generar_dataset_rl_diario_h3.py`, H=8) — y comparar "Umbral cobre" con holding=3 de esa corrida contra el mismo experimento de 9.20 dio Sharpe 3.73 vs. 1.59 (más del doble), pese a que esa estrategia ni siquiera usa el forecast de NHITS para elegir dirección. La causa: el take-profit sí depende de `nhits_h1`, y valores de forecast distintos entre corridas mueven el resultado de cualquier estrategia que pase por ese mecanismo. Desde acá en adelante, las comparaciones dentro de un mismo dataset regenerado son válidas entre sí, pero **no** contra resultados de una corrida distinta de NHITS.
+Idea de Bastián (sin cambios): en vez de un take-profit fijo en `nhits_h1`, usar el horizonte más lejano (h1/h2/h3) en que el forecast de NHITS se mantiene en la misma dirección y con distancia creciente (`36_entorno_trading_rl_diario_tp_adaptativo.py`, holding fijo de 3 días; el entorno cobra ahora spread ida+vuelta en cada operación). La nota metodológica original sigue vigente: NHITS no tiene semilla fija en `35`, así que resultados de datasets NHITS distintos no son comparables entre sí; por eso esta sección compara todo sobre el mismo dataset (`dataset_entrenamiento_rl_diario_h3_alineado.csv`).
 
-**Resultado** (walk-forward de 5 ventanas × 60 días, holding=3, mismo dataset para las tres estrategias):
+**Resultado corregido** (`64` lote C, 5 × 60 días, holding=3, mismo dataset para todo):
 
-| Estrategia | Retorno total | Sharpe | Max drawdown | Win rate |
+| Estrategia | Original (Sharpe) | **Corregido, neto: 3 semillas** | Corregido, bruto | Operaciones |
 |---|---|---|---|---|
-| Umbral cobre (referencia) | +266.1% | 3.73 | -6.1% | 66.3% |
-| PPO baseline (TP=h1 siempre) | +90.1% | 2.13 | -12.6% | 58.0% |
-| PPO TP adaptativo (h1/h2/h3) | +88.7% | 2.04 | **-20.0%** | 54.5% |
+| Umbral cobre (signo de train) | 3.73 | **-0.89** [-2.63, 0.64] (-30.7%) | 0.67 | 95 |
+| PPO, TP = h1 fijo | 2.13 | **-1.67, -0.81, -0.65** (-25% a -47%) | 0.00, 0.78, 0.94 | 100 |
+| PPO, TP adaptativo (h1/h2/h3) | 2.04 | **-1.78, -0.75, -0.28** (-14% a -49%) | -0.11, 0.89, 1.34 | 100 |
+| *Control: dirección al azar (bruto)* | — | — | *1.30 (p5 -0.23; p95 2.56)* | 100 |
 
-El TP adaptativo no mejora sobre el TP fijo — retorno y Sharpe levemente más bajos, drawdown casi el doble. La distribución de horizontes elegidos (44% h1, 27% h2, 29% h3) muestra que la regla sí varía de verdad, no colapsó a una sola opción.
+**Desglose por horizonte elegido** (suma de retornos por operación, % del capital, neto de costos, PPO TP adaptativo; `correccion_rl_tpadapt_desglose_horizonte.csv`):
 
-**Pero el desglose por horizonte elegido es lo interesante** (PnL total suma $88.72 ≈ el +88.7% de retorno, confirmando que las tres partes explican el agregado):
-
-| Horizonte elegido | n | PnL promedio | PnL total | % stop-loss |
+| Horizonte elegido | n | Semilla 42 | Semilla 7 | Semilla 123 |
 |---|---|---|---|---|
-| h1 (se estancó) | 43 | +$0.55 | +$23.66 | 18.6% |
-| h2 (consistente hasta h2) | 27 | **-$1.33** | **-$35.84** | **33.3%** |
-| h3 (consistente hasta h3) | 29 | **+$3.48** | **+$100.90** | 10.3% |
+| h1 (se estancó) | 52 | -31.9% | -44.1% | -6.9% |
+| h2 (consistente hasta h2) | 24 | -18.9% | -23.9% | -13.6% |
+| h3 (consistente hasta h3) | 24 | +24.3% | +6.3% | +10.6% |
 
-Cuando el forecast se sostiene hasta h3, esas operaciones concentran casi toda la ganancia del sistema. El grupo intermedio (consistente solo hasta h2) es el que pierde plata — con el doble de stop-loss que los otros dos grupos — y arrastra hacia abajo lo que de otra forma sería una señal razonable. El resultado agregado plano esconde dos efectos de signo contrario que se cancelan, no una ausencia de señal.
+**Lectura corregida**: el TP adaptativo sigue sin mejorar sobre h1 fijo — ambos pierden con costos y sus brutos están dentro de la banda del control al azar. El patrón del desglose sí se repite en dirección (el grupo "consistente hasta h3" es el único con suma positiva en las tres semillas, h2 negativo en las tres), pero con 24 operaciones por grupo, sin IC, y con un simulador cuyo piso al azar es positivo, no alcanza para leerlo como señal: es un corte a posteriori de un resultado agregado negativo. La conclusión original ("dos efectos de signo contrario que se cancelan, no ausencia de señal") no se sostiene con estos datos: lo que hay es un agregado negativo con un subgrupo menos negativo.
 
-Días reales de holding (no solo la razón de cierre, sino cuántos días duró cada posición — instrumentado agregando el índice del día de salida a `ejecutar_operacion_multidia()`, sin reentrenar nada): take-profit y stop-loss promedian 1.4-1.8 días en ambas variantes, no 1.0 — la mayoría de esas salidas no fueron el día 1 (que hubiera sido idéntico al agente de 9.17), sino el día 2 o más tarde. El mecanismo de holding multi-día funciona de verdad en la mayoría de las operaciones, no solo en las que llegan al final de la ventana.
+Días reales de holding: el mecanismo multi-día sigue funcionando como se describió (la mayoría de las salidas por TP/SL ocurre después del día 1); eso no depende del timestamp.
 
-Esta lectura ("h3 concentra la ganancia, h2 es sistemáticamente el peor") motivó el Issue #10 (9.24): en vez de inferirlo indirectamente del mecanismo adaptativo, mapearlo directamente con un barrido de TP fijo por horizonte.
+### 9.24 Issue #10: barrido de take-profit fijo por horizonte × ventana de holding (subconjunto rehecho 2026-09-23)
 
-### 9.24 Issue #10: barrido de take-profit fijo por horizonte (h1-h5) × ventana de holding (N=3,5,7)
+> **Errata**: la versión original corrió 15 combinaciones (h1-h5 × N=3,5,7) y concluyó que "h2 es sistemáticamente el peor horizonte" y que N=7/h4 era el mejor resultado individual (Sharpe 2.73). Heredaba el artefacto de timestamp y el bug de costos (9.35), usaba una sola semilla y comparaba 15 configuraciones sobre los mismos 300 días sin IC. **No se rehízo la grilla completa** (35 combinaciones con 9.26, ~15 min de PPO cada una, más semillas): se rehízo un subconjunto representativo de 12 combinaciones — N ∈ {3, 5, 7, 14} × h ∈ {1, 2, 4}, una semilla (42) — elegido para cubrir exactamente las afirmaciones de 9.24/9.26 (h2 vs. sus vecinos, la "zona buena" N=5-7, el "mejor" N=7/h4 y la "segunda zona buena" N=14). Las combinaciones h3/h5 y N=10/12/20 no se rehicieron.
 
-Barrido completo, sin adaptación: take-profit fijo en cada horizonte de forecast (h1 a h5) cruzado con cada ventana de holding (N=3, 5, 7 días) — 15 combinaciones, cada una con su propio agente PPO entrenado en el mismo esquema de walk-forward de siempre (5 ventanas × 60 días, 100k timesteps). Requirió extender el dataset una vez más (`39_generar_dataset_rl_diario_h5.py`, H=10) para tener `nhits_h4`/`nhits_h5`, y generalizar el entorno multi-día (`32_entorno_trading_rl_diario_multidia.py`, parámetro `horizonte_tp`, default=1 preserva el comportamiento original). Las 15 combinaciones comparten el mismo dataset — a diferencia de 9.20 vs. 9.23, acá sí son comparables entre sí sin el caveat de reproducibilidad de NHITS.
+Mismo diseño (`32` con `horizonte_tp` configurable, dataset con h1-h5 de 39, ahora realineado por 63; entorno con spread ida+vuelta). `64` lote D + `65`.
 
-| N | h | Retorno total | Sharpe | Días reales | Cierre en ventana | Trailing stop | Take-profit | Stop-loss |
-|---|---|---|---|---|---|---|---|---|
-| 3 | h1 | +14.7% | 0.57 | 2.35 | 42.0% | 18.0% | 17.0% | 23.0% |
-| 3 | h2 | -1.7% | 0.06 | 2.30 | 41.0% | 20.0% | 18.0% | 21.0% |
-| 3 | h3 | +11.3% | 0.48 | 2.35 | 42.0% | 19.0% | 19.0% | 20.0% |
-| 3 | h4 | +28.0% | 0.90 | 2.43 | 41.0% | 21.0% | 16.0% | 22.0% |
-| 3 | h5 | +42.7% | 1.22 | 2.38 | 46.0% | 18.0% | 17.0% | 19.0% |
-| 5 | h1 | +77.1% | 2.13 | 3.32 | 38.3% | 26.7% | 13.3% | 21.7% |
-| 5 | h2 | +62.9% | 1.83 | 3.07 | 31.7% | 25.0% | 20.0% | 23.3% |
-| 5 | h3 | **+89.3%** | **2.38** | 3.28 | 33.3% | 28.3% | 20.0% | 18.3% |
-| 5 | h4 | +78.6% | 2.21 | 3.17 | 30.0% | 30.0% | 20.0% | 20.0% |
-| 5 | h5 | +54.4% | 1.67 | 3.23 | 33.3% | 26.7% | 16.7% | 23.3% |
-| 7 | h1 | +50.0% | 1.96 | 3.83 | 12.5% | 55.0% | 17.5% | 15.0% |
-| 7 | h2 | +29.1% | 1.27 | 3.65 | 15.0% | 45.0% | 20.0% | 20.0% |
-| 7 | h3 | +47.1% | 2.17 | 3.48 | 10.0% | 40.0% | 35.0% | 15.0% |
-| 7 | h4 | +74.8% | **2.73** | 3.85 | 12.5% | 52.5% | 22.5% | 12.5% |
-| 7 | h5 | +37.6% | 1.50 | 3.65 | 10.0% | 50.0% | 20.0% | 20.0% |
+| N | h | Original: Sharpe | **Corregido: PPO neto** [IC95] | Corregido: PPO bruto | Corregido: Umbral cobre neto / bruto | *Azar, bruto (media)* | Decisiones |
+|---|---|---|---|---|---|---|---|
+| 3 | h1 | 0.57 | **0.31** [-0.93, 1.38] | 1.70 | 0.70 / 2.27 | *0.98* | 100 |
+| 3 | h2 | 0.06 | **-0.03** [-1.55, 1.28] | 1.56 | 0.97 / 2.52 | *1.15* | 100 |
+| 3 | h4 | 0.90 | **-0.18** [-1.65, 1.11] | 1.51 | 0.78 / 2.33 | *1.08* | 100 |
+| 5 | h1 | 2.13 | **-1.66** [-4.58, 0.70] | -0.20 | 0.16 / 1.36 | *1.03* | 60 |
+| 5 | h2 | 1.83 | **-1.00** [-3.46, 0.89] | 0.27 | -0.27 / 1.14 | *1.05* | 60 |
+| 5 | h4 | 2.21 | **-1.35** [-4.56, 0.84] | -0.02 | 0.21 / 1.39 | *1.03* | 60 |
+| 7 | h1 | 1.96 | **-0.18** [-2.39, 1.84] | 0.87 | 0.93 / 2.18 | *0.46* | 40 |
+| 7 | h2 | 1.27 | **-0.11** [-1.51, 1.23] | 1.05 | 0.39 / 1.65 | *0.02* | 40 |
+| 7 | h4 | **2.73** | **-0.29** [-2.01, 1.16] | 0.87 | 0.51 / 1.74 | *0.10* | 40 |
+| 14 | h1 | 1.96 | **0.84** [-0.69, 2.06] | 1.53 | 0.68 / 1.49 | *0.63* | 20 |
+| 14 | h2 | 1.12 | **0.64** [-0.88, 1.71] | 1.32 | 0.38 / 1.18 | *0.34* | 20 |
+| 14 | h4 | 1.77 | **0.49** [-1.32, 1.69] | 1.17 | 0.29 / 1.11 | *0.25* | 20 |
 
-*(Sin gráfico de curva de capital para esta grilla — 15 curvas individuales no aportan más que la tabla; los CSV completos de cada combinación están en `datos/resultados/grilla_nh_N{N}_h{h}_operaciones.csv`.)*
+(Original de `grilla_nh_metricas.csv`/`grilla_nh_largo_metricas.csv`; corregido en `correccion_rl_metricas_todas.csv`, archivos por corrida en `datos/resultados/correccion_rl/`.)
 
-**h2 es sistemáticamente el peor o casi peor horizonte en las tres ventanas de holding** (Sharpe 0.06 en N=3, el mínimo de todo el grupo; 1.83 en N=5, el segundo más bajo; 1.27 en N=7, el más bajo) — confirma, con un diseño controlado e independiente, el mismo patrón que ya había aparecido indirectamente en el desglose de 9.23 (el subgrupo "consistente solo hasta h2" perdía plata). No es un artefacto del mecanismo adaptativo — apuntar a h2 como objetivo fijo es, por sí solo, la peor elección en los tres holdings probados.
-
-**N=5 es la ventana con mejor comportamiento general** — los cinco Sharpe de esa fila (1.67 a 2.38) son todos razonables, sin ningún valor tan bajo como los de N=3 (0.06-1.22). El mejor resultado individual de toda la grilla es N=7/h4 (Sharpe 2.73), y el retorno más alto es N=5/h3 (+89.3%) — pero ambos son puntos aislados dentro de series con bastante variación entre h vecinos (ej. N=7 va de 1.27 a 2.73 según el h elegido), así que no se puede tratar ningún combo individual como "el óptimo" sin más validación.
-
-**Patrón de razón de cierre, igual que en 9.20/9.23**: a mayor N, más operaciones se resuelven por trailing stop (18-21% en N=3, 25-30% en N=5, 40-55% en N=7) y menos por llegar al final de la ventana sin activar nada (41-46% → 30-38% → 10-15%) — el mecanismo de holding largo se activa cada vez más, independiente del horizonte de TP elegido.
-
-**Limitaciones, dichas sin atenuar**:
-- **Tamaño de muestra decreciente con N** (100 decisiones en N=3, 60 en N=5, 40 en N=7) — los resultados de N=7 en particular son los más ruidosos de la grilla.
-- **Un solo seed (42) y una sola corrida de NHITS** — no se promedia sobre múltiples semillas ni se valida el patrón de "h2 es malo" en un periodo de test distinto.
-- **No se probaron combinaciones con h > N cuyo objetivo cae fuera de la ventana de holding** de forma explícita en el análisis (ej. h5 con N=3) — se corrieron igual (están en la tabla) pero no se interpretaron por separado; el patrón de h2-malo/N=5-bueno ya es consistente sin necesitar ese recorte.
-- **Esto no es una recomendación de despliegue** — es evidencia de que el horizonte de TP importa y de que hay una interacción real con N, no una prueba de que N=7/h4 vaya a repetirse fuera de esta muestra.
+**Lectura corregida**:
+- **"h2 es sistemáticamente el peor horizonte" no se replica**: en ninguna de las 4 filas h2 es el peor neto — en N=5 es incluso el mejor de la fila (-1.00 contra -1.66 y -1.35), y en N=3, N=7 y N=14 el peor es h4. Las diferencias entre h dentro de una fila son mucho menores que los IC95 (anchos de 2-5 puntos de Sharpe).
+- **Ninguna de las 12 combinaciones tiene un Sharpe neto distinguible de cero**; los 12 IC95 cruzan el cero. El "mejor individual" N=7/h4 pasa de 2.73 a -0.29.
+- Los Sharpe brutos positivos (PPO y sobre todo la regla del cobre, 1.1-2.5) hay que leerlos contra el control al azar del mismo simulador (0.0-1.2) y contra lo esperable como máximo de 12 configuraciones sin señal (≈1.5): el sesgo del trailing stop/TP con precios de cierre (9.17, 9.20) explica buena parte, y el resto no sobrevive al spread.
 
 ### 9.25 Tareas pendientes en el Issue #10
+
+> Nota (2026-09-23): registro histórico; el patrón "h2 es malo" que se daba por confirmado se reevaluó en 9.24 corregida (ver 9.35).
 
 - [x] Regenerar el dataset diario con horizonte NHITS extendido a h5 (`39_generar_dataset_rl_diario_h5.py`).
 - [x] Generalizar el entorno multi-día para aceptar un horizonte de take-profit configurable (`32_entorno_trading_rl_diario_multidia.py`, parámetro `horizonte_tp`).
@@ -670,74 +641,51 @@ Barrido completo, sin adaptación: take-profit fijo en cada horizonte de forecas
 - [x] Confirmar si el patrón "h2 es malo" del desglose de 9.23 se replica con un diseño controlado — sí, en las tres ventanas de holding probadas.
 - [x] Cerrar la Tarea de Notion "Barrer take-profit fijo por horizonte..." con este hallazgo documentado.
 
-### 9.26 Issue #11: ¿el patrón de N=7 (menos stop-loss, menos drawdown) se sostiene con ventanas más largas?
+### 9.26 Issue #11: ¿el patrón de N=7 (menos stop-loss, menos drawdown) se sostiene con ventanas más largas? (subconjunto rehecho 2026-09-23)
 
-Bastián observó en 9.24 que N=7 tenía el mejor perfil de riesgo de la grilla original (menos operaciones cerradas por stop-loss, drawdown más chico) — exactamente el comportamiento buscado: que la posición se mueva a favor y, si se da vuelta, se cierre por trailing-stop o take-profit en vez de un stop-loss duro. Pidió extender el barrido a N ∈ {10, 12, 14, 20} para ver si esa mejora se sostiene al alargar aún más la ventana. Mismo dataset (ya llegaba a h5, no hizo falta regenerar NHITS) y mismo entorno (`32_entorno_trading_rl_diario_multidia.py`, ya generalizado) — solo cambió el rango de N. Implementado en `42_backtest_walkforward_diario_grilla_nh_largo.py`, 20 combinaciones nuevas.
+> **Errata**: la versión original extendió la grilla a N ∈ {10, 12, 14, 20} y describió "dos zonas buenas" (N=5-7 por Sharpe, ~1.9-2.0; N=14 por drawdown y % de stop-loss) separadas por un bache en N=10-12. Heredaba el artefacto de timestamp, el bug de costos y la falta de IC (9.35). **Solo se rehízo N=14** (con h1/h2/h4, dentro del subconjunto de 9.24); N=10, 12 y 20 no se rehicieron por cómputo — con los resultados corregidos de 9.24 no hay una "zona buena" que delimitar.
 
-**Resumen, promediando sobre h1-h5 para cada N** (grilla completa: 3, 5, 7 de 9.24 + 10, 12, 14, 20 de esta sección):
+Resultado corregido (tabla completa en 9.24): N=14 da Sharpe neto 0.49-0.84 en los tres horizontes, con drawdown máximo de -7% a -10% — el mejor perfil de riesgo del subconjunto, igual que en la versión original — pero sobre **20 decisiones** en total, con IC95 de [-1.32, 1.69] a [-0.69, 2.06]. N=5 y N=7, la "zona buena" original, quedan en Sharpe neto -1.7 a -0.1. Es decir: el patrón original no se sostiene, y el único bloque con números positivos es el de menor muestra, que es exactamente donde más se espera un máximo por azar entre 12 configuraciones (≈1.6 para 20 decisiones). La limitación que la propia versión original declaraba ("con 15-30 decisiones no se puede distinguir 'N=14 es mejor' de 'N=14 tuvo una racha favorable'") es la lectura correcta.
 
-| N | Sharpe promedio | Drawdown promedio | % stop-loss promedio | Decisiones totales |
-|---|---|---|---|---|
-| 3 | 0.65 | -22.8% | 21.0% | 100 |
-| 5 | **2.04** | -14.2% | 21.3% | 60 |
-| 7 | 1.92 | -8.6% | 16.5% | 40 |
-| 10 | 1.33 | -10.9% | **23.3%** | 30 |
-| 12 | 0.70 | -10.0% | 17.6% | 25 |
-| 14 | 1.62 | **-5.3%** | **16.0%** | 20 |
-| 20 | 0.35 | -7.9% | 20.0% | 15 |
-
-![Sharpe, drawdown y % stop-loss promedio por N](../datos/resultados/grilla_nh_resumen_por_N.png)
-
-**Respuesta a la pregunta: no, el patrón NO es monótono.** En vez de seguir mejorando con N, aparecen dos zonas separadas por un bache: N=5-7 (mejor Sharpe, 1.9-2.0) y N=14 (mejor drawdown y mejor % de stop-loss, incluso superando a N=7) — con N=10 y N=12 empeorando en el medio (el % de stop-loss en N=10, 23.3%, es *peor* que en N=3 y N=5) y N=20 colapsando (Sharpe promedio 0.35, uno de los cinco resultados individuales da levemente negativo). La hipótesis implícita de "alargar más sigue ayudando" queda rechazada por la evidencia, igual que la Propuesta A original del Issue #9.
-
-**Limitación central, no un detalle menor**: el número de decisiones cae fuerte con N (100 en N=3 → 15 en N=20, con `N_TEST_POR_VENTANA=60` fijo) — gran parte del vaivén entre N=10/12/14/20 puede ser ruido de muestra chica en vez de una señal real sobre la ventana de holding "correcta". Con 15-30 decisiones totales no se puede distinguir con confianza "N=14 es genuinamente mejor" de "N=14 tuvo una racha favorable en este tramo de test" — haría falta otro periodo de test o más ventanas de walk-forward para separar ambas explicaciones, lo que queda fuera del alcance de esta sesión.
+![Resumen por N (versión original, invalidada; se conserva como registro)](../datos/resultados/grilla_nh_resumen_por_N.png)
 
 ### 9.27 Tareas pendientes en el Issue #11
+
+> Nota (2026-09-23): registro histórico; ver 9.26 corregida y 9.35.
 
 - [x] Correr la grilla extendida (N=10,12,14,20 × h1-h5, 20 combinaciones) reusando el dataset y el entorno ya generalizados del Issue #10.
 - [x] Responder si el patrón de bajo stop-loss/drawdown de N=7 se sostiene al alargar más — no de forma monótona; aparece una segunda zona buena en N=14 mismo con un bache en N=10-12 y un colapso en N=20.
 - [ ] Decidir si vale la pena correr otro periodo de test (no solo el tramo final del dataset) para separar señal real de ruido de muestra chica en N=10 a N=20, antes de usar este patrón para una decisión de diseño.
 - [x] Cerrar la Tarea de Notion "Extender la grilla N x h del Issue #10..." con este hallazgo documentado.
 
-### 9.28 Issue #12: ¿la señal del cobre generaliza a otras monedas commodity? (AUD, CAD, NZD)
+### 9.28 Issue #12: ¿la señal del cobre generaliza a otras monedas commodity? (AUD, CAD, NZD — resultados corregidos 2026-09-23)
 
-Bastián pidió retomar dos Tareas de Notion en paralelo (esta y la de "mantener" posición, ver 9.29) usando la skill `radar-baseline` para investigar papers y repos que respaldaran ambas decisiones. El baseline encontrado (ver el Issue [#12](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/12) para el detalle completo de la investigación): ningún repo externo supera reusar el propio pipeline ya validado en 9.17, con dos anclas teóricas — Chen & Rogoff (2003, "Commodity Currencies") y Ferraro/Rogoff/Rossi (2015, valida que el vínculo commodity→FX es robusto a frecuencia diaria y desaparece a mensual/trimestral, exactamente el patrón ya visto con el cobre) — más una tesis metodológica (Hancer 2025, TU Delft) que respalda reentrenar desde cero por moneda en vez de transferir pesos de CLP. Se decidió empezar por AUD (commodity fundamental real: cobre, igual que CLP) y, a pedido explícito de Bastián, generar CAD y NZD en paralelo usando la misma señal de cobre — con la advertencia ya documentada de que el commodity fundamental real de CAD es petróleo y el de NZD es lácteos, no cobre, así que esto testea si el efecto cobre *genérico* también aplica ahí, no si su propio commodity lo haría mejor. CAD además tiene señales de alerta documentadas (reversión de signo histórica en la relación petróleo-CAD según el Banco de Canadá, *decoupling* reciente confirmado en 2026).
+> **Errata**: la versión original reportaba que AUD y NZD "replican o superan" a CLP (Umbral cobre +692.0% / Sharpe 4.92 en AUD, +397.7% / 3.84 en NZD) y que CAD era más débil (+33.1% / 0.86). Heredaba el artefacto de timestamp y el bug de costos (9.35); con apalancamientos de 5.4-9.6x el costo omitido era todavía más decisivo que en CLP. Se reentrenó todo con los datasets realineados, spread por par y 3 semillas.
 
-**Dataset**: mismo patrón que `26_generar_dataset_rl_diario.py` (NHITS walk-forward con refit cada 5 días + GARCH diario + MACD/RSI/min-max + `copper_ret_1d`/`copper_mom_5d`), reusando casi toda la lógica vía `importlib` — lo único específico de cada moneda es la fuente de la serie de precio, tomada ya limpia del panel de 13 pares (`panel_fx_diario.csv`, Issue #6/9.14) en vez de volver a descargar y limpiar tickers de yfinance. Scripts `45`/`46`/`47`. Los tres datasets quedaron con 1.469 días de decisión, 2020-12-11 a 2026-09-09.
+Contexto (sin cambios): Bastián pidió probar la señal del cobre en otras monedas commodity (radar-baseline con anclas en Chen & Rogoff 2003 y Ferraro, Rogoff & Rossi 2015; ver el Issue [#12](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/12)). Datasets con el mismo patrón que 26 (scripts `45`/`46`/`47`, serie de precio tomada del panel de 23 en convención "USD por unidad de moneda extranjera"), ahora realineados por `63` (el chequeo sobre esos datasets: correlación operable del cobre -0.003 en AUD, -0.021 en CAD, 0.006 en NZD; la contemporánea, 0.41 / 0.31 / 0.36). El bug de signo que la versión original encontró y corrigió (la regla del cobre escrita para USD/CLP crudo daba la dirección invertida en el panel normalizado) desaparece como problema: el signo de la regla ahora se estima con el train de cada ventana. Spread ida+vuelta supuesto: AUD 0.02%, NZD 0.03%, CAD 0.02%.
 
-**Bug real encontrado y corregido antes de reportar** (mismo criterio de "verificar antes de creer un número sospechoso" del resto del proyecto): la primera corrida de AUD dio un resultado catastrófico para "Umbral cobre" (-94.2%, Sharpe -7.6) — sospechosamente peor que el +532.3% de CLP en 9.17. Causa: `posiciones_umbral_cobre()` (`22_kelly_diario_cobre.py`) tiene el signo hardcodeado para la convención cruda de `usdclp_long.csv` (y = CLP por USD; cobre sube → y baja). Pero el dataset de AUD/CAD/NZD sale del panel, que ya normaliza a "USD por 1 unidad de moneda extranjera" (cobre sube → la moneda se aprecia → y **sube** — signo opuesto). Confirmado con la propia tabla de correlaciones del panel (`panel_fx_correlacion_cobre_por_par.csv`): **las 13 correlaciones son positivas**, incluyendo USD/CLP (+0.25) en esa convención — al revés del signo negativo que asume la función original, escrita para la serie cruda sin normalizar. El PPO no se vio afectado (aprende la dirección por prueba y error, sin regla hardcodeada) — solo la comparación heurística "Umbral cobre" tenía el signo invertido. Corregido con una función local por moneda (`posiciones_umbral_cobre_apreciacion`) antes de volver a correr los tres backtests completos.
+**Backtest corregido** (`64` lote A + `65`, mismo esquema que 9.17: 5 × 60 días, 2025-06 a 2026-09):
 
-**Backtest final walk-forward** (mismo esquema que 9.17: 5 ventanas × 60 días, 300 días out-of-sample, 2025-06-26 a 2026-09-09 — prácticamente idéntico al tramo de CLP en 9.17, 1 día de diferencia por el corte del walk-forward):
-
-| Moneda | Estrategia | Retorno total | Sharpe anualizado | Max drawdown | Operaciones |
+| Moneda | Estrategia | Original | **Corregido, neto** [IC95] | Corregido, bruto [IC95] | Apalancamiento mediano |
 |---|---|---|---|---|---|
-| **AUD/USD** | Umbral cobre | **+692.0%** | **4.92** | -13.4% | 290 |
-| AUD/USD | PPO (RL diario) | +380.0% | 3.90 | -15.6% | 300 |
-| **NZD/USD** | Umbral cobre | **+397.7%** | **3.84** | -13.2% | 290 |
-| NZD/USD | PPO (RL diario) | +201.2% | 2.67 | -16.4% | 300 |
-| **USD/CAD** | Umbral cobre | +33.1% | 0.86 | -25.9% | 290 |
-| USD/CAD | PPO (RL diario) | -4.2% | 0.06 | -25.2% | 300 |
-| *(referencia) USD/CLP, 9.17* | Umbral cobre | *+532.3%* | *4.39* | *-13.5%* | *290* |
-| *(referencia) USD/CLP, 9.17* | PPO (RL diario) | *+397.1%* | *3.88* | *-8.8%* | *299* |
+| AUD/USD | Umbral cobre | +692.0% / 4.92 | **+47.9% / 1.11** [-0.78, 2.90] | 1.90 [0.01, 3.69] | 5.9x |
+| AUD/USD | PPO, 3 semillas | +380.0% / 3.90 | **-17% a -30% / -0.39, -0.78, -0.42** | 0.22, -0.11, 0.22 | 5.7-6.0x |
+| NZD/USD | Umbral cobre | +397.7% / 3.84 | **-29.0% / -0.58** [-2.33, 1.03] | 0.45 [-1.25, 2.02] | 5.4x |
+| NZD/USD | PPO, 3 semillas | +201.2% / 2.67 | **-20% a +11% / -0.21, 0.44, -0.37** | 0.78, 1.36, 0.75 | 5.3-5.4x |
+| USD/CAD | Umbral cobre | +33.1% / 0.86 | **-3.8% / 0.07** [-1.93, 1.88] | 1.45 [-0.52, 3.26] | 9.6x |
+| USD/CAD | PPO, 3 semillas | -4.2% / 0.06 | **-15% a -26% / -0.45, -0.91, -1.21** | 0.67, 0.19, -0.37 | 9.3-9.9x |
+| *(ref.) USD/CLP, 9.17* | Umbral cobre | +532.3% / 4.39 | *-65.5% / -2.37* | *1.66* | 3.8x |
+| *Control al azar, bruto (media; p95)* | | | | *AUD 0.40 (1.92); NZD 0.54 (1.98); CAD 0.25 (1.76)* | |
 
-**Cuánto dinero se arriesgó realmente por operación, no solo el % de retorno** — verificado explícitamente porque los retornos son altos y ya hay precedente de un bug de apalancamiento sin acotar en este proyecto (sección 9.14-9.15, el caso PEN). El motor de riesgo (`simular_con_gestion_riesgo`, idéntico para las 4 monedas) calcula `notional = (3% del capital) / (1.0 × vol_garch del día)` — el tamaño de la posición varía a diario según la volatilidad GARCH pronosticada, para que la pérdida máxima si toca el stop-loss sea siempre 3% del capital vigente:
+(Buy-and-hold sin apalancar en el mismo tramo: AUD +9.3% / 0.95, NZD -3.1% / -0.27, CAD +0.1% / 0.04. Sensibilidad a spread en `correccion_rl_sensibilidad_spread.csv`.)
 
-| Moneda | Notional mediano | Apalancamiento mediano (notional/capital) | Apalancamiento máximo | Días con leverage >10x |
-|---|---|---|---|---|
-| USD/CLP (referencia 9.17) | $886 | 3.76x | 5.99x | 0/299 |
-| AUD/USD | $1.193–1.366 | 5.9x | 7.4x | 0/300 |
-| NZD/USD | $876–949 | 5.4x | 6.7x | 0/300 |
-| **USD/CAD** | $958–1.104 | **9.6x** | **11.4x** | **104-108/300** |
+**Lectura corregida**:
+1. **La "generalización" era la de la correlación contemporánea**, que en efecto es más fuerte en AUD/NZD/CAD que en CLP (9.14) — pero no es operable, y en estos tres datasets la correlación operable es cero.
+2. **El único número neto positivo, Umbral cobre en AUD (Sharpe 1.11), no es evidencia de edge**: IC95 [-0.78, 2.90]; su bruto (1.90) está en el borde de la banda del control al azar del mismo simulador (p95 = 1.92); saliendo siempre al cierre (sin TP/SL) el bruto cae a 1.39, igual al p95 del azar en esa variante (1.37); la correlación operable del cobre en ese dataset es -0.003; su spread de breakeven es 0.048% del notional (con 0.05% ya pierde: Sharpe -0.07); y es 1 de 12 filas moneda × estrategia. Lo más probable es la combinación del sesgo del simulador con un tramo en que AUD subió (buy-and-hold Sharpe 0.95) y la regla, con signo +1, quedó más tiempo comprada en AUD.
+3. **El PPO pierde en las tres monedas con costos** (9 de 9 semillas × moneda con Sharpe neto entre -1.21 y 0.44, todas con IC95 que incluye el cero o negativo).
+4. El caveat original se mantiene y ahora pesa a favor de la conclusión negativa: las cuatro monedas comparten el mismo tramo de test, no son cuatro pruebas independientes.
 
-Ninguna moneda repite el colapso del caso PEN (que llegaba a 30-40x) — no es un bug de código. Pero **CAD operó con casi el triple de apalancamiento mediano que CLP** (menor volatilidad GARCH diaria estimada en este período → el motor de riesgo le asigna automáticamente más tamaño de posición para el mismo 3% de riesgo objetivo) y aun así fue la moneda con peor resultado — si se normalizara el apalancamiento de CAD al nivel de CLP, su +33.1%/-4.2% serían todavía más débiles de lo que ya parecen. El Sharpe (que ya normaliza por la volatilidad de los retornos) es la métrica más honesta para comparar entre monedas; el retorno total en % no es 100% apples-to-apples porque el apalancamiento de base difiere.
-
-**Lectura**:
-1. **La señal generaliza, tal como anticipaba la teoría**: AUD y NZD replican (e incluso superan) el patrón de CLP — las dos monedas donde Chen & Rogoff predice el vínculo más fuerte con el cobre.
-2. **El PPO pierde contra el umbral simple de cobre en las 4 monedas ya probadas, no solo en CLP** — patrón consistente, no una particularidad de una corrida. En AUD la brecha es de 312 puntos porcentuales, en NZD de 196 pp, y en CAD el PPO directamente pierde plata mientras el umbral simple es positivo. Con esta consistencia, vale la pena cuestionar en serio si la maquinaria del agente (forecast NHITS, GARCH, TP/SL aprendido) está agregando valor neto frente a operar la dirección del cobre con una regla de una línea.
-3. **CAD no es solo "más débil" — es cualitativamente distinto**, no un punto intermedio: el PPO pierde plata y "Umbral simple" (forecast sin cobre) es catastrófico (-43.1%, no reportado en la tabla de arriba por espacio, ver `walkforward_diario_cad_metricas.csv`), en el MISMO período donde AUD/NZD funcionaban bien. Confirma, de forma falsable (la señal de alerta se documentó *antes* de correr el experimento, no después), que CAD depende de un driver distinto (petróleo) que el cobre no captura.
-4. **Caveat explícito**: las tres corridas nuevas comparten prácticamente la misma ventana de test que CLP en 9.17 — no son 4 pruebas independientes en el tiempo, son 4 activos evaluados en el mismo régimen de mercado. El contraste con CAD (mismo período, resultado opuesto) atenúa la duda pero no la elimina del todo.
-
-**Decisiones pendientes**: AUD y NZD califican para el siguiente nivel de refinamiento (grilla N×h, como los Issues #10/#11 hicieron con CLP) — CAD con la señal de cobre no lo amerita todavía (su driver real, petróleo, sigue sin testear con su propia serie). El hallazgo del punto 2 (PPO pierde consistentemente contra el umbral simple en las 4 monedas) queda como pregunta abierta sobre si vale la pena seguir invirtiendo en la complejidad del agente en vez de en la señal misma.
+**Apalancamiento** (verificación original, sigue siendo válida como descripción del risk sizing): notional = 3% del capital / vol GARCH; mediano 3.8x en CLP, 5.4-5.9x en AUD/NZD, 9.6x en CAD (104-108 días con >10x en la versión original). Con costos proporcionales al notional, ese apalancamiento es precisamente lo que convierte un spread "chico" en una pérdida grande: en CAD, un spread de 0.05% ya lleva la regla del cobre a Sharpe -2.0.
 
 ### 9.29 Tarea pospuesta: acción "mantener" al vencer la ventana de holding
 
@@ -765,143 +713,215 @@ También se re-verificó BRL=X y ZAR=X (ya en `datos/bases/panel_fx_diario.csv` 
 
 Con Fase 0 completa, las Fases 1-3 de Issue #13 usan los 6 candidatos sin descartar ninguno — a diferencia de litio, ningún ticker resultó demasiado ilíquido para justificar el filtro.
 
-### 9.31 Issue #13 Fase 1: screening de correlación NOK/ZAR/BRL × 5 commodities, con corrección FDR y bootstrap SPA
+### 9.31 Issue #13 Fase 1: screening de correlación NOK/ZAR/BRL × 5 commodities, con corrección FDR y SPA sobre el universo (corregido 2026-09-23)
 
-Mismo método que validó `copper_ret_1d` en 9.14: escaneo de rezagos -2 a +3 (`52_screening_correlacion_commodities_fx.py`) entre el retorno diario de cada commodity y el retorno de cada moneda, sobre **3 monedas × 5 commodities × 6 rezagos = 90 pruebas**. Con ese volumen la corrección Benjamini-Hochberg FDR (`statsmodels.stats.multitest.multipletests`, α=0.05) se aplicó sobre las 90 pruebas juntas antes de mirar ninguna individualmente — la tabla completa (positivos y negativos) está en `datos/resultados/fase1_screening_correlacion_completo.csv`.
+> **Errata**: la versión original reportaba 11 de 90 combinaciones sobreviviendo FDR "concentradas en el rezago +1 (predictivo)" (NOK×WTI 0.275, ZAR×Platino 0.228, ...) y un SPA de Hansen con p=0.0 sobre los 10 sobrevivientes. Con la alineación corregida esas correlaciones resultan ser **contemporáneas**, y el SPA estaba mal planteado (solo sobre los sobrevivientes del mismo screening). Números originales en 9.35.
 
-![Heatmap de correlación por rezago, 90 pruebas](../datos/resultados/fase1_screening_heatmap.png)
+Mismo diseño que el original — 3 monedas (NOK, ZAR, BRL) × 5 commodities (WTI, oro, platino, soja, hierro) × 6 rezagos (-2..+3) = 90 pruebas, Benjamini-Hochberg FDR al 5% sobre las 90 juntas, umbral |r|≥0.11 — pero con el retorno del commodity de cada fila FX tomado del último settlement **anterior** al precio FX (`61_screening_spa_universo_corregido.py`). En este marco el rezago 0 es el contemporáneo (no operable) y los rezagos +1..+3 son operables. Datos de monedas del panel alineado de 60.
 
-**Resultado: 11 de 90 combinaciones sobreviven FDR y superan el umbral |r|=0.11**, todas concentradas en el rezago +1 (predictivo) salvo una en rezago +2:
+| Rezago | Qué es | Corr. media (15 pares) | Máx. \|r\| | Sobreviven FDR | Sobreviven FDR y \|r\|≥0.11 |
+|---|---|---|---|---|---|
+| -2 | la moneda lidera | 0.007 | 0.049 | 1 | 0 |
+| -1 | la moneda lidera | 0.035 | 0.074 | 6 | 0 |
+| **0** | **contemporáneo** | **0.138** | **0.266** | **12** | **10** |
+| +1 | operable | -0.010 | 0.120 | 1 | 1 |
+| +2 | operable | 0.024 | 0.077 | 3 | 0 |
+| +3 | operable | -0.010 | 0.054 | 2 | 0 |
 
-| Moneda | Commodity | Rezago | Correlación | p-valor FDR |
+![Screening corregido](../datos/resultados/correccion_fase1_screening_heatmap.png)
+
+Los 10 "hallazgos" de la versión original reaparecen, con prácticamente los mismos valores (NOK×WTI 0.266, ZAR×Platino 0.228, ZAR×Oro 0.194, BRL×Soja 0.189, ...), **en el rezago 0**: son la correlación del mismo día. El ordenamiento económico que se destacaba (cada moneda correlaciona más con su exportación dominante) es real, pero contemporáneo. En los rezagos operables sobrevive una sola combinación: **NOK×WTI en +1 con r = -0.120 — de signo contrario al económico** (reversión tras el día contemporáneo, no continuación), el mismo "-0.135 en rezago +2" que la versión original había dejado como hallazgo secundario (tabla completa en `correccion_fase1_screening_completo.csv`).
+
+**SPA sobre el universo completo, no sobre los sobrevivientes.** 53 aplicó el test de Hansen solo a las 10 estrategias que ya habían ganado un screening de 90 pruebas en la misma muestra — eso no corrige el data-snooping de la búsqueda, lo hereda. Aquí el universo es todo lo que se exploró como estrategia operable: 15 pares × 3 rezagos operables (+1, +2, +3) × 2 signos = **90 estrategias** (incluir ambos signos evita que el signo elegido mirando toda la muestra entre gratis), posición = signo × signo(retorno del commodity), benchmark = no operar, bootstrap estacionario de 5.000 réplicas:
+
+| Universo (90 estrategias, T=4.106 días) | p-valor SPA (lower / consistent / upper) | Estrategias mejores que no operar | Sharpe máximo del universo | E[Sharpe máximo] bajo H0 (90 pruebas) |
 |---|---|---|---|---|
-| NOK | WTI | +1 | **0.275** | 3.7e-74 |
-| ZAR | Platino | +1 | **0.228** | 3.2e-50 |
-| ZAR | Oro | +1 | 0.194 | 2.1e-36 |
-| BRL | Soja | +1 | 0.186 | 9.6e-34 |
-| BRL | Platino | +1 | 0.183 | 9.6e-33 |
-| NOK | Platino | +1 | 0.178 | 3.0e-31 |
-| NOK | Oro | +1 | 0.172 | 3.9e-29 |
-| BRL | WTI | +1 | 0.138 | 8.8e-19 |
-| NOK | WTI | +2 | -0.135 | 3.0e-18 |
-| BRL | Oro | +1 | 0.118 | 5.0e-14 |
-| ZAR | WTI | +1 | 0.118 | 5.1e-14 |
+| Bruto (spread 0) | 0.39 / 0.54 / 0.55 | 0 | 0.59 (BRL×Platino, +2) | 0.62 |
+| Neto (spread ida+vuelta por moneda) | 0.73 / 1.00 / 1.00 | 0 | -0.57 | 0.62 |
 
-El signo es siempre el esperado económicamente (commodity sube ⇒ la moneda commodity se aprecia frente al USD, con las series ya invertidas a "USD por unidad de moneda") y, igual que en 9.14, el efecto está concentrado casi por completo en el rezago +1 — no en el 0 (contemporáneo) ni en los rezagos negativos (que chequearían si es la moneda la que lidera al commodity) — descartando el mismo mecanismo de contaminación de timestamp que ya se descartó para cobre-CLP. 14 combinaciones adicionales sobreviven FDR pero no superan |r|=0.11 (estadísticamente distintas de cero con n>4.100, pero económicamente chicas — se documentan en el CSV completo, no se descartan silenciosamente).
+(`correccion_fase1_spa_universo.csv`.) **No se rechaza que ninguna de las 90 estrategias le gane a no operar, ni siquiera sin costos**: el mejor Sharpe bruto del universo (0.59) está por debajo de lo que se esperaría como máximo de 90 estrategias sin ninguna señal (0.62, Bailey & López de Prado 2014). Los 10 sobrevivientes originales, ejecutados de forma operable con su signo original, dan Sharpe bruto entre -0.53 (ZAR×Platino) y 0.23 (BRL×Oro), todos con IC95 que incluye el cero salvo ZAR×Platino (significativamente negativo), y netos entre -1.2 y -2.4 (`correccion_fase1_sobrevivientes_originales_operables.csv`). La validación con FRED H.10 (9.35) da la misma imagen con una fuente independiente: NOK×WTI, ZAR×Platino, ZAR×Oro y BRL×Soja tienen correlación contemporánea 0.23-0.36 y operable entre -0.01 y 0.02.
 
-**Refuerzo con bootstrap SPA de Hansen** (`53_bootstrap_spa_supervivientes.py`, `arch.bootstrap.SPA`, bootstrap estacionario, 5.000 repeticiones): se testearon los 10 supervivientes de rezago +1 (el rezago +2 de NOK-WTI queda como hallazgo secundario no operable con una regla diaria simple, no se lleva al bootstrap) con una estrategia de juguete — posición = signo(r) × signo(retorno del commodity), sin Kelly ni gestión de riesgo, contra un benchmark de "no operar". **El p-valor conjunto de SPA es 0.0 en los tres criterios (lower/consistent/upper)** — se rechaza con margen amplio la hipótesis nula de que ninguna de las 10 estrategias le gana al benchmark, y las 10 se identifican individualmente como mejores que no operar bajo el criterio estándar de Hansen (`consistent`). Sharpe anualizado de esta estrategia de juguete: 1.67 (BRL×Oro) a 3.50 (ZAR×Platino) — en el mismo orden de magnitud que el Sharpe ~4.5 que ya se había encontrado para cobre-CLP en 9.14 con el mismo tipo de señal simple, no un número fuera de escala para este proyecto.
+**Caveat de la versión original que se mantiene**: oro y platino comparten un factor (correlación 0.60 entre sí), así que los pares con metales preciosos nunca fueron señales independientes — ahora es irrelevante, porque ninguna es operable.
 
-Tabla completa por estrategia (Sharpe, retorno promedio diario, significancia bajo los 3 criterios de Hansen) en `datos/resultados/fase1_bootstrap_spa.csv`.
+### 9.32 Issue #13 Fase 2: regímenes históricos con selección solo con datos previos (corregido 2026-09-23)
 
-**Caveat honesto, verificado antes de festejar el resultado — posible factor común, no 10 mecanismos independientes**: que prácticamente todas las combinaciones moneda×commodity den positivo (oro Y platino Y petróleo Y soja, para las 3 monedas) es distinto al patrón de cobre-CLP (una relación específica, ancorada en Chen & Rogoff). Se verificó la correlación cruzada de los 5 commodities entre sí: oro-platino correlaciona 0.60 (ambos metales preciosos, plausible que compartan un factor macro común — tasas reales, apetito de riesgo), mientras que el resto de los pares está en 0.02-0.21 — no hay un único factor dominante que explique las 90 pruebas, pero el par oro-platino sí comparte varianza real, así que los hallazgos de ZAR/NOK/BRL × oro y × platino no deben leerse como 6 señales completamente independientes. Dicho esto, la correlación **más fuerte de cada moneda coincide con su exportación de materia prima dominante** (NOK-petróleo 0.275, el mayor de todos — Noruega es exportador neto de petróleo; ZAR-platino 0.228 — Sudáfrica es el mayor productor mundial de platino; BRL-soja 0.186 — Brasil es el mayor exportador mundial de soja), la misma lectura de "generalización que confirma la teoría" que dio el panel de 13 pares en 9.14. La Fase 2 (walk-forward en múltiples regímenes históricos) es el chequeo real de si esto sobrevive fuera de un screening in-sample sobre toda la historia.
+> **Errata**: la versión original concluía que "9 de 10 pares se sostienen con Sharpe positivo en los 3 regímenes (2014-2016, 2020, 2022)". Ese chequeo no era fuera de muestra: los 3 regímenes estaban dentro de la muestra 2010-2026 con la que Fase 1 eligió pares y signo (54:42-46,118), y la regla usaba el retorno contemporáneo. Números originales en 9.35.
 
-### 9.32 Issue #13 Fase 2: walk-forward en 3 regímenes históricos distintos — los 10 pares se sostienen
+Corrección (`62_regimenes_seleccion_previa_corregido.py`): para cada régimen se repite el procedimiento de selección de Fase 1 completo (90 pruebas, FDR 5%, |r|≥0.11, ahora en rezagos operables) usando **solo datos anteriores al inicio del régimen**, con el signo también de esos datos; después se evalúa dentro del régimen, bruto y con spread. Para no depender de que el filtro deje pasar algo, se reporta además el universo completo (15 pares, rezago +1, signo pre-régimen) — la tabla entera, sin elegir.
 
-Mismo principio que 9.14 del Issue #5 (validar el Sharpe de cobre-CLP en 2015-2016/2017-2018/2020-2021 antes de comprometerse a construir algo nuevo): antes de dar por buenos los 10 pares de Fase 1 (screening in-sample sobre toda la historia + SPA), `54_walkforward_multiperiodo_supervivientes.py` repite dos chequeos **dentro de cada uno de 3 regímenes históricos deliberadamente distintos** — 2014-2016 (crash prolongado de petróleo, fin del superciclo de commodities), 2020 (shock de demanda COVID, con el propio WTI llegando a precio negativo en medio de la ventana) y 2022 (invasión a Ucrania, spike de energía/alimentos) — sin refitear ningún parámetro dentro de cada régimen (la dirección de la señal queda fija desde Fase 1, esto prueba generalización temporal, no una nueva calibración):
+| Régimen | Datos de selección | Seleccionados (FDR + \|r\|≥0.11 + operable) | Sharpe en el régimen de los seleccionados (bruto / neto) | Universo de 15 pares: Sharpe bruto medio / neto medio | Pares con Sharpe neto > 0 |
+|---|---|---|---|---|---|
+| 2014-2016 (crash petróleo) | 2010-2013 (~990 días) | 0 | — | -0.12 / -1.91 | 0 de 15 |
+| 2020 (shock COVID) | 2010-2019 (~2.550 días) | 0 | — | 0.05 / -1.08 | 2 de 15 |
+| 2022 (guerra/inflación) | 2010-2021 (~3.080 días) | 2: NOK×WTI (+1, r=-0.15), NOK×Platino (+2, r=0.12) | 0.03 / -1.27 y 0.33 / -0.95 | -0.05 / -1.70 | 1 de 15 |
 
-1. **Escaneo de rezagos -2..+3 restringido a cada régimen**: ¿el pico en el rezago +1 (predictivo) que se ve en toda la historia se repite dentro de cada régimen por separado, con mucho menos n (259-782 obs. según el régimen)?
-2. **Backtest de la regla ya validada por SPA** (posición = signo(r de Fase 1) × signo(retorno del commodity), sin Kelly ni gestión de riesgo — mismo caveat que abajo) dentro de cada régimen.
+(`correccion_fase2_seleccionados_pre_regimen.csv`, `correccion_fase2_universo_por_regimen.csv`, `correccion_fase2_resumen.csv`.)
 
-**El pico en rezago +1 se sostiene en los 3 regímenes para 9 de los 10 pares** (tabla completa en `datos/resultados/fase2_escaneo_rezagos_por_regimen.csv`) — la excepción es `ZAR × WTI` en 2022, donde el rezago +1 deja de ser significativo (p=0.13, n=259) aunque sí lo es en 2014-2016 y 2020. `NOK × Platino` y `ZAR × Oro` también muestran una correlación débil y no significativa específicamente en el régimen 2020 (p=0.52 y p=0.14 respectivamente), aunque se recuperan con fuerza en 2022.
+**Lectura**: con datos anteriores a 2014 y a 2020 el procedimiento de Fase 1 no selecciona ningún par operable; antes de 2022 selecciona dos (ambos NOK) que dentro de 2022 no tienen correlación (r = -0.01 y -0.05) ni Sharpe distinguible de cero. En el universo completo, el Sharpe bruto medio por régimen está entre -0.12 y 0.05 — ruido alrededor de cero, con los IC95 individuales cruzando el cero en 44 de 45 casos (la excepción, ZAR×WTI en 2014-2016, bruto 1.19 [0.15, 2.25], es una de 45 pruebas y pierde con costos). La "generalización temporal" de la versión original era el reflejo de haber elegido los pares con una muestra que contenía los propios regímenes, medido además sobre el retorno contemporáneo. La hipótesis económica que se destacaba (el petróleo más estable que los metales preciosos en 2020) queda sin objeto.
 
-![Sharpe por régimen histórico, 10 pares](../datos/resultados/fase2_sharpe_por_regimen.png)
+### 9.33 Issue #13 Fase 3 (Nivel 0): TFT sobre el panel ampliado — corregido 2026-09-23 (bug de alineación del forecast + control solo-CLP)
 
-**Resumen de consistencia (Sharpe > 0 en cuántos de los 3 regímenes)**:
+> **Errata**: la versión original reportaba TFT panel -21.8% / Sharpe -1.65 y concluía que "TFT prediciendo retorno a h=1 no aprende nada, ni pooled ni solo-CLP". Tenía dos problemas: (1) un **bug de alineación** en `56_tft_panel_walkforward.py` (líneas 68-73, 102, 110-111): la fila de `cross_validation` con `ds`=D contiene el pronóstico del retorno que termina en D (hecho con información hasta D-1), y el backtest la aplicaba al retorno D→D+1 — cada posición usaba el pronóstico del retorno de ayer; la auditoría mostró que solo realinear eso llevaba el Sharpe de -1.18 a ~+3.8, pero con el panel todavía contaminado por el artefacto de timestamp (9.35), así que ese +3.8 tampoco era real; y (2) el control "TFT solo-CLP" que se citaba no estaba en el código (el CSV existía, ningún script lo generaba) y cubría solo la ventana 5.
 
-| Par | Regímenes con Sharpe > 0 | Sharpe promedio | Sharpe mínimo |
-|---|---|---|---|
-| ZAR × Platino | 3/3 | 4.21 | 2.53 |
-| NOK × WTI | 3/3 | 3.92 | 2.84 |
-| BRL × Platino | 3/3 | 3.50 | 2.30 |
-| BRL × Soja | 3/3 | 3.18 | 1.12 |
-| BRL × WTI | 3/3 | 3.09 | 1.86 |
-| NOK × Oro | 3/3 | 2.94 | 0.51 |
-| ZAR × WTI | 3/3 | 2.87 | 0.82 |
-| ZAR × Oro | 3/3 | 2.67 | **0.002** (2020, prácticamente ruido) |
-| BRL × Oro | 3/3 | 1.59 | **0.009** (2020, prácticamente ruido) |
-| NOK × Platino | **2/3** | 3.48 | **-0.06** (2020, el único negativo de los 30 pares×régimen) |
+`66_tft_panel_corregido.py` corrige las tres cosas a la vez, sin cambiar la configuración de 56 (h=1, `input_size=20`, `max_steps=1500`, `es_commodity` estática, mismas features, semilla 42): (a) la decisión en t usa la fila de `cross_validation` cuyo **cutoff es t** (pronóstico del retorno t→t+1); chequeo explícito: la correlación entre el objetivo del pronóstico y el retorno realizado de cada decisión es 1.0; (b) panel alineado de 60 (cobre conocido antes del precio FX); (c) control solo-CLP con la misma arquitectura en las **5** ventanas. Mismo mapeo a posición que 22/56 (Kelly `f = μ/σ²`, clip ±1) y spread ida+vuelta de 0.15% (más la cota inferior de rotación). ~3.6 horas de cómputo por variante.
 
-**Lectura honesta**: 9 de 10 pares tienen Sharpe positivo en los 3 regímenes, y el único caso negativo (`NOK × Platino` en 2020, Sharpe -0.06) es esencialmente ruido alrededor de cero, no una pérdida sistemática — coherente con que ese mismo par también tiene la correlación de rezago +1 más débil de los 30 (par × régimen) dentro de 2020. El patrón que sí aparece de forma consistente: **el régimen 2020 (COVID) es el más débil para casi todos los pares que involucran oro o platino** (`ZAR×Oro`, `BRL×Oro`, `NOK×Platino` rondan Sharpe ~0-0.5 ese año, contra 2-6 en los otros regímenes) — plausible que la dinámica de refugio/liquidez de 2020 haya roto temporalmente la relación "commodity sube ⇒ moneda commodity se aprecia" para los metales preciosos (oro subió como refugio mientras el dólar también se fortalecía en el pánico inicial, un mecanismo distinto al de exportación de materia prima). El petróleo (NOK×WTI, ZAR×WTI, BRL×WTI) es notablemente más estable en los 3 regímenes que oro/platino, consistente con ser un canal de exportación más directo (Noruega/petróleo, Brasil también exporta petróleo) que el de metales preciosos.
+| Configuración (300 días) | RMSE | RMSE "predecir cero" | Acierto dirección | Corr. forecast-retorno | % días saturado | Sharpe bruto [IC95] | **Sharpe neto 0.15%** | Neto, cota rotación |
+|---|---|---|---|---|---|---|---|---|
+| Original (56, desalineado) | 0.00783 | 0.00768 | 47.7% | -0.075 | 97.7% | -1.65 (con 0.05% al cambiar) | — | — |
+| **TFT panel, corregido** | 0.0085 | 0.0078 | 48.7% | 0.088 | 98.0% | -0.65 [-2.17, 0.93] | **-3.67** (-42.5%) | -1.58 |
+| **TFT solo-CLP, corregido** | 0.0095 | 0.0078 | 48.3% | 0.072 | 99.3% | -0.46 [-2.13, 1.29] | **-3.49** (-40.9%) | -1.71 |
 
-**Caveat de método que aplica a TODA esta sección, para no repetir el error de 9.14**: los retornos totales de la tabla completa (`fase2_backtest_por_regimen.csv`, no reproducida completa acá por espacio — algunos superan +500-700% en la ventana 2014-2016) usan la MISMA estrategia de juguete que Fase 1 (posición unitaria fija cada día, sin Kelly, sin límite de apalancamiento real, sin costos más allá del signo) — es exactamente el tipo de cifra que en 9.14 resultó estar inflada por apostar el 100% del capital todos los días. **El Sharpe es la métrica confiable de esta sección** (no depende del tamaño de la posición, mismo argumento que 9.14); el retorno en dólares NO debe leerse como "cuánto se ganaría en la práctica" sin antes definir una regla de sizing real — esa decisión queda para si Bastián decide construir una estrategia real sobre alguno de estos pares, no es el objetivo de Issue #13.
+(`correccion_tft_metricas.csv`, forecasts en `correccion_tft_{panel,solo_clp}_forecasts.csv`.)
 
-**Conclusión de Fase 2**: los 10 pares de Fase 1 generalizan razonablemente bien fuera de muestra temporal — no es un artefacto de un solo régimen reciente. `ZAR×Platino`, `NOK×WTI`, `BRL×Platino` son los 3 más consistentes (Sharpe mínimo > 2.3 en cualquier régimen); los pares con oro/platino como commodity son los que más se debilitan en el régimen 2020 específicamente, un patrón económicamente interpretable (refugio vs. exportación), no ruido aleatorio.
+**Lectura corregida**: con el forecast alineado y el panel sin el artefacto, TFT sigue sin aprender nada útil — RMSE peor que predecir cero, acierto de dirección bajo 50%, correlación de 0.07-0.09 que no alcanza para un Sharpe bruto distinguible de cero —, pooled o solo-CLP por igual. La conclusión de la versión original ("TFT no aprende señal, ni pooled ni solo") resulta cierta, pero por las razones correctas recién ahora: antes se llegaba a ella con un forecast desalineado (y el Sharpe +3.8 que aparecía al realinearlo era el artefacto de timestamp filtrándose por `copper_ret_1d`). La hipótesis que motivaba esta fase — que un mecanismo de pooling mejor arreglaba el problema de 9.14 — queda sin objeto, porque 9.14 corregida no tiene una sensibilidad operable al cobre que un pooling pueda aprovechar. La posición saturada en ±1 el 98-99% de los días (el mismo problema de escala de Kelly diario de 9.14) hace que los costos pesen al máximo: -41% a -42% en 300 días.
 
-### 9.33 Issue #13 Fase 3 (Nivel 0): TFT sobre el panel ampliado (con NOK) — no supera el criterio de éxito, y el diagnóstico muestra por qué
+### 9.34 Issue #13 Fase 4 (Nivel 1): port del Momentum Transformer — corregido 2026-09-23
 
-Primero se extendió el panel de 13 pares de 9.14 agregando NOK (`55_panel_extendido_con_nok.py`, `datos/bases/panel_fx_diario_extendido.csv`, 14 monedas, 60.561 filas) con la misma receta de features que las otras 13. Después, `56_tft_panel_walkforward.py` entrena `neuralforecast.models.TFT` (h=1, `input_size=20`, `max_steps=1500` — mismo presupuesto que resolvió el forecast "chato" de N-HiTS en la sección 4.1) sobre el panel completo, con `es_commodity` como covariable estática explícita y el ID de cada moneda como embedding nativo de `unique_id`, para pronosticar el retorno diario de CLP. Igual que 9.14/22/23, el forecast (`mu_pred`) alimenta la misma fórmula de Kelly (`f = mu_pred/σ², clip ±1`) y el mismo walk-forward de 5 ventanas × 60 días, para comparar contra los mismos baselines.
+> **Errata**: la versión original presentaba el Momentum Transformer como "la mejor estrategia de todo el proyecto" (+36.6%, Sharpe 5.29, acierto de dirección 64.1%, correlación posición-retorno 0.359) y, escalado 3×, "superando el criterio de éxito" (+85.3%, Sharpe 5.42). El Sharpe venía de aprender la relación **contemporánea** cobre→FX que la feature `copper_ret_1d` filtraba por el artefacto de timestamp (9.35); y el argumento del escalado 3× no era evidencia: escalar la posición por una constante no cambia el Sharpe (salvo por el clip a ±1), el factor 3× se eligió mirando el test para cruzar el +83%, y el CSV que lo respaldaba (`fase4_momentum_transformer_escalado_apalancamiento.csv`) no lo produce ningún script del repo. Ese argumento se elimina.
 
-**Resultado crudo: retorno -21.8%, Sharpe -1.65 — peor que TODOS los baselines de 9.14, incluido buy-and-hold (-2.7%).** No cumple el criterio de éxito (igualar o superar +83.0% de solo-CLP).
+**Diseño (sin cambios, sigue siendo válido como descripción del port)**: repo ancla [kieranjwood/trading-momentum-transformer](https://github.com/kieranjwood/trading-momentum-transformer) (Wood, Giegerich, Roberts & Zohren 2021), leído solo como referencia de arquitectura. `57_momentum_transformer_port.py` porta la Variable Selection Network (GRN + softmax sobre features), una auto-atención causal simple y la `SharpeLoss` (`-mean(pos×y)/std(pos×y)×√252`), con la red emitiendo la posición directamente (tanh) en vez de un forecast; volatility targeting de 15% con clip a ±1; entrenamiento pooled sobre las 14 monedas con embedding de moneda. La razón de diseño (entrenar contra Sharpe en vez de pronosticar un retorno, lo que falló en Fase 3) sigue siendo razonable.
 
-| Estrategia | Retorno total | Sharpe |
+**Corrección** (`67_momentum_transformer_corregido.py`, que importa arquitectura, pérdida e hiperparámetros de 57 sin tocarlos): panel alineado de 60; 5 semillas; spread ida+vuelta de USD/CLP (0.15%) sobre |posición| cada día como cota superior y, como la posición es continua y persistente, la cota inferior de rotación (solo se paga el cambio de posición) — aquí la rotación es la aproximación más realista.
+
+| Configuración (295 días) | Original | **Corregido, 5 semillas: media (mín., máx.)** |
 |---|---|---|
-| Kelly diario (con cobre) | +86.2% | 4.57 |
-| Umbral cobre | +83.5% | 4.44 |
-| Kelly diario (solo CLP) | +83.0% | 4.42 |
-| Kelly diario (panel pooled OLS, 13 pares) | +67.9% | 3.77 |
-| Buy-and-hold | -2.7% | -0.13 |
-| **TFT panel (14 monedas, esta fase)** | **-21.8%** | **-1.65** |
+| Sharpe bruto | 5.29 (1 semilla) | **0.81** (-0.51, 1.41); ningún IC95 excluye el cero (ej. semilla 2024: 1.41 [-0.59, 3.31]) |
+| Sharpe neto, cota rotación 0.15% | — | **-0.55** (-1.85, 0.08) |
+| Sharpe neto, ida+vuelta diaria 0.15% | — | **-1.91** (-3.30, -1.17) |
+| Retorno total bruto | +36.6% | +2.9% (-1.3%, +5.0%) |
+| Acierto de dirección | 64.1% | 50.6% |
+| Correlación posición - retorno siguiente | 0.359 | 0.053 |
+| Exposición media / % días saturado | ~37% / 2.4% | ~20% / 0% |
 
-**Antes de aceptar un número tan malo como "el hallazgo", se verificó igual que se verifica uno sospechosamente bueno** (mismo estándar del proyecto desde el bug de apalancamiento de 9.14): la posición estuvo saturada en ±1 (el límite de apalancamiento) el **97.7% de los días** — la misma firma del problema de 9.14. Eso obliga a separar dirección de tamaño antes de creer el número:
+(`correccion_momentum_transformer_metricas.csv`, `correccion_momentum_transformer_resumen.csv`.)
 
-1. **Diagnóstico de la señal, no solo del backtest**: el RMSE promedio del forecast de TFT (0.00783) es prácticamente **idéntico** al RMSE de predecir simplemente "cero" todos los días (0.00768, la varianza del propio retorno) — TFT no está aportando información. El acierto de dirección (signo del forecast vs. signo del retorno real, alineado correctamente día a día) es **47.7%**, peor que una moneda al aire, y la correlación forecast-retorno real es **-0.075**. Con una señal así de mala, la saturación de apalancamiento simplemente amplifica el ruido en la dirección equivocada la mitad de las veces — coherente con el Sharpe muy negativo, no un artefacto separado.
-2. **Control aislando pooling vs. arquitectura**: para saber si el problema es el *pooling* (la hipótesis de 9.15 que esta fase debía atacar) o es *TFT en sí* para esta tarea, se entrenó un TFT idéntico usando **solo** la historia de CLP (sin las otras 13 monedas), mismo `h=1`/`input_size`/`max_steps`, sobre la ventana 5 (la de más datos disponibles). Resultado: **RMSE 0.00635 contra 0.00531 de predecir cero (peor todavía, en términos relativos, que la versión pooled)**, acierto de dirección 48.3%, correlación -0.091.
+**Lectura corregida**: sin el artefacto, el Momentum Transformer no tiene señal: acierto de dirección de 50.6% (de 64.1%), correlación posición-retorno de 0.05 (de 0.36), Sharpe bruto medio 0.81 con una semilla negativa y todos los IC95 cruzando el cero, y neto de costos entre -0.55 (cota optimista) y -1.91. El 64% de acierto original era la capacidad de la red de leer en `copper_ret_1d` un movimiento del cobre que ocurría durante la misma ventana que el retorno a "predecir". Queda como enseñanza metodológica: el modelo más expresivo del proyecto fue también el que más eficientemente explotó la fuga de información, y su Sharpe "sospechosamente alto" (5.3, el más alto del proyecto) era exactamente la señal de alarma que el propio proyecto dice aplicar.
 
-| Configuración | RMSE | RMSE "predecir cero" | Acierto dirección | Correlación |
-|---|---|---|---|---|
-| TFT panel (14 monedas pooled) | 0.00783 | 0.00768 | 47.7% | -0.075 |
-| TFT solo-CLP (control) | 0.00635 | 0.00531 | 48.3% | -0.091 |
+**Limitaciones** que siguen: sin búsqueda de hiperparámetros (a propósito — sería otra configuración elegida sobre el mismo test), sin el módulo de detección de cambio de régimen del paper original, un único período de test.
 
-**Lectura honesta, y es distinta de lo que se esperaba investigar**: el diagnóstico descarta la hipótesis que motivó esta fase (que el pooling ingenuo específicamente perjudica a CLP) — el TFT solo-CLP es *igual de malo o levemente peor* (en términos relativos al ruido) que el pooled, no mejor. El problema real no es el mecanismo de pooling, es que **TFT pronosticando el retorno diario directamente a h=1 no aprende señal alguna sobre USD/CLP**, entrenado solo o pooled. Es un resultado distinto — y más interesante — que "el pooling con ID como covariable estática arregla 9.14": ni siquiera hace falta que el pooling sea el problema, porque el forecast de retorno a 1 paso ya fracasa antes de llegar a esa pregunta.
+### 9.35 Errata y corrección metodológica (2026-09-23)
 
-**Hipótesis de por qué (no verificada más a fondo, documentada como tal)**: la sección 4.1 de este mismo paper ya mostró que un forecast diario funciona razonablemente con N-HiTS, pero pronosticando el **nivel de precio** a **h=14 pasos** (donde la autocorrelación/persistencia del nivel ayuda mucho) — no el **retorno** a **h=1 paso** (que en una serie eficiente es información casi pura, cercana a ruido blanco por definición). Pedirle a un modelo con 1.7M de parámetros (TFT, con atención + LSTM + variable selection) que aprenda una señal de retorno a 1 día es un objetivo mucho más difícil que el que ya resolvió N-HiTS, y el hallazgo de 22 (`copper_ret_1d` con |r|=0.25) es justamente la clase de señal específica y chica que un modelo general no tiene por qué redescubrir solo con MAE/atención genérica, sin que esa relación esté explícitamente destacada en la arquitectura o la función de pérdida.
+Dos auditorías independientes del código (septiembre 2026) encontraron problemas que invalidan los resultados de la línea diaria de esta extensión (9.13-9.14, 9.17, 9.20, 9.22-9.28, 9.31-9.34). Esta sección explica qué estaba mal, con la evidencia, qué se cambió, y deja registro de los números originales para que la historia sea trazable. Las secciones afectadas se reescribieron con los resultados corregidos (no se les agregó un apéndice: los números inválidos se reemplazaron). Las secciones 1-8 (forecasting) y la línea semanal de RL (9.1-9.12, 9.16, 9.18) no dependen de nada de esto y no cambian.
 
-**Conclusión de Fase 3**: no se cumple el criterio de éxito del Issue #13. El hallazgo real y documentado no es "el pooling con TFT falla" sino "TFT prediciendo retorno a h=1 no aprende nada, ni pooled ni solo" — una limitación distinta y más fundamental de la que se planteó atacar, que queda como aprendizaje honesto para el diseño de la Fase 4 (que por eso NO usa un objetivo de forecast de retorno: entrena la posición directamente contra el Sharpe ratio, sorteando este problema específico).
+**Resumen, sin atenuar**: la "señal predictiva" del cobre sobre USD/CLP (y de WTI/oro/platino/soja sobre NOK/ZAR/BRL) era, casi completa, la correlación **contemporánea** entre commodity y moneda, mal fechada por la forma en que Yahoo etiqueta las barras diarias FX. Los backtests además entraban a un precio anterior a la señal que usaban, y cobraban una fracción del costo real. Corregido todo eso, **ninguna estrategia diaria del proyecto — reglas simples, Kelly, PPO, TFT, Momentum Transformer — tiene un Sharpe neto de costos distinguible de cero o positivo**; varias quedan significativamente negativas.
 
-### 9.34 Issue #13 Fase 4 (Nivel 1): port del Momentum Transformer — Sharpe más alto de todo el proyecto, con matices honestos sobre cómo leerlo
+#### 9.35.1 El artefacto de timestamp
 
-**Repo ancla**: [kieranjwood/trading-momentum-transformer](https://github.com/kieranjwood/trading-momentum-transformer) (638★, MIT, Wood, Giegerich, Roberts & Zohren 2021, arXiv:2112.08534), clonado aparte (`/c/tmp_momtrans`, fuera de este repo) **solo para leer su código como referencia de arquitectura** — no se usa su pipeline de datos (Pinnacle CLC vía Quandl).
+- Yahoo Finance etiqueta la barra diaria de un par FX (`CLP=X`, `AUDUSD=X`, `NOK=X` y todo el panel de 23/55) con fecha D, pero el precio es el de **~00:00 UTC de D**, es decir ~20:00 de Nueva York del día **D-1** (19:00 en invierno).
+- El "cierre" diario de un futuro de commodity (`HG=F`, `CL=F`, `GC=F`, `PL=F`, `ZS=F`, `TIO=F`) con fecha D es su **settlement de ~13:00-14:30 ET del mismo día D**.
+- Por lo tanto, el retorno FX etiquetado D+1 (20:00 NY de D-1 → 20:00 NY de D) cubre **17 de las 24 horas** de la ventana del retorno del commodity etiquetado D (settlement D-1 → settlement D). Lo que el proyecto llamó "rezago +1 predictivo" era mayormente la reacción simultánea. Y el backtest entraba al precio de la fila D (20:00 NY de D-1) usando como señal un settlement que ocurre ~17 horas después.
 
-**Decisión de diseño 1 (no trivial)**: el repo ancla es TensorFlow 1.x-style Keras — no es código "importable" en un proyecto PyTorch. Y `neuralforecast.models.TFT` (ya usado en Fase 3) **ya es una reimplementación fiel de la misma arquitectura VSN+atención en PyTorch** — portar esa parte desde cero habría sido reescribir dos veces lo mismo. La pieza genuinamente nueva del Momentum Transformer frente a un TFT genérico (y frente a la Fase 3 de este mismo Issue) **no es la arquitectura de atención en sí, es el mecanismo de entrenamiento**: en vez de pronosticar un valor y convertirlo después en posición (lo que hizo Fase 3, y lo que falló), entrena la red para emitir la posición directamente (salida `tanh` en [-1,1]) optimizando el Sharpe ratio como función de pérdida diferenciable (`SharpeLoss`, idéntica a `mom_trans/deep_momentum_network.py:37-48` del ancla: `-mean(pos×y)/std(pos×y)×√252`). Por eso `57_momentum_transformer_port.py` porta específicamente: (a) la Variable Selection Network (GRN + softmax sobre las features, port directo de `gated_residual_network()`/`lstm_combine_and_mask()` del ancla) + (b) una auto-atención causal simple + (c) la SharpeLoss idéntica — y no reimplementa el resto del andamiaje TFT completo, que Fase 3 ya cubrió (y que además, dado el resultado de 9.31, no era el problema a resolver).
+Evidencia (`58_validacion_timestamp.py`; scripts originales de la auditoría en `codigos/validacion_timestamp/`, datos en `datos/bases/validacion_timestamp/`):
 
-**Decisión de diseño 2**: volatility targeting. El paper ancla escala la posición cruda por `VOL_TARGET/vol_anualizada` (`VOL_TARGET=15%`). Se reusa el `vol_realizada` propio del proyecto en vez de introducir una constante nueva, clipeado a ±1 (mismo límite que el resto del proyecto).
+**A. ¿A qué hora del reloj corresponde la barra diaria?** Con barras horarias de Yahoo (730 días), se buscó qué hora UTC reproduce mejor el retorno de la barra diaria:
 
-**Decisión de diseño 3**: se entrena pooled sobre las 14 monedas del panel extendido (igual que Fase 3), con el ID de moneda como `nn.Embedding` aprendido (análogo al embedding de `unique_id` de TFT) — para mantener el mismo eje de comparación de mecanismos de pooling que Fase 3 (OLS ingenuo, TFT+Kelly, y ahora Sharpe-loss directa).
+| Ticker | Hora UTC que mejor reproduce la barra diaria | Correlación de retornos |
+|---|---|---|
+| AUDUSD=X | **00:00 UTC de D** (≈20:00 NY de D-1) | 0.973 |
+| NOK=X | **00:00 UTC de D** | 0.972 |
+| HG=F (cobre) | **17:00 UTC de D** (≈13:00 ET, settlement) | 0.985 |
+| CLP=X | 10:00 UTC (ajuste pobre) | 0.575 |
 
-**Resultado con la configuración default (target_vol=15%)**:
+(CLP=X horario es de mala calidad — precios constantes durante horas, par poco líquido — y no permite fijar su hora con barras horarias; para CLP la evidencia viene del dólar observado del BCCh, tabla B.)
 
-| Estrategia | Retorno total | Sharpe | Max drawdown | % días saturado en ±1 |
-|---|---|---|---|---|
-| Kelly diario (con cobre) | +86.2% | 4.57 | -3.5% | ~97% (9.14) |
-| Umbral cobre | +83.5% | 4.44 | -3.4% | — |
-| Kelly diario (solo CLP) | +83.0% | 4.42 | -3.6% | ~97% (9.14) |
-| Kelly diario (panel pooled OLS) | +67.9% | 3.77 | -3.9% | ~97% (9.14) |
-| Buy-and-hold | -2.7% | -0.13 | -13.2% | — |
-| TFT panel (Fase 3) | -21.8% | -1.65 | -22.0% | 97.7% |
-| **Momentum Transformer (esta fase)** | **+36.6%** | **5.29** | **-1.6%** | **2.4%** |
+**B. USD/CLP vs. cobre en relojes consistentes** (tabla completa en 9.14 y `errata_timestamp_clp_rezagos.csv`): con barras horarias de ambas series a la misma hora (18:00 o 20:00 UTC) la correlación está en el rezago 0 (-0.44 / -0.46) y el +1 es ≈0 (0.02); con el dólar observado del BCCh reetiquetado al día de transacción, rezago 0 = -0.39; con los datos diarios de Yahoo y la alineación corregida, rezago 0 = -0.25 y operable = -0.07.
 
-**No cumple el criterio literal del Issue (retorno ≥ 83.0%) con su configuración default — pero antes de leerlo como un fracaso, hay que mirar por qué, con el mismo rigor que se le aplicó al -21.8% de Fase 3**: a diferencia de TFT, acá **sí hay señal real**. Acierto de dirección 64.1% (compárese con el 47-48% de TFT, o el 58-64% típico de las señales de commodities de Fase 1), correlación posición-retorno futuro de **0.359** (más fuerte que cualquier par commodity-moneda de la Fase 1, que rondaron 0.12-0.28), y la posición está saturada en el límite de apalancamiento solo el **2.4% de los días** — nada que ver con el 97%+ de saturación casi constante de TODAS las estrategias Kelly de este proyecto (9.14 y Fase 3). El motivo del retorno en dólares más bajo no es una señal más débil: es que el *volatility targeting* usa, en promedio, solo ~37% del capital por día (exposición mucho más conservadora), mientras las demás estrategias comparadas están apostando cerca del 100% del capital casi todos los días.
+**C. Validación cruzada con una fuente independiente: FRED H.10** (tipo de cambio comprador al mediodía de Nueva York, Reserva Federal). Para cada settlement t se mide la correlación con el retorno FX contemporáneo y con el operable (entrada en el primer precio FX posterior al settlement — mediodía de t+1 en FRED, ~20:00 NY de t en Yahoo — y salida en el siguiente), más el Sharpe de la regla signo-del-commodity con **signo fijado por la teoría** (no estimado), bruto y neto de spread (`errata_timestamp_fred_vs_yahoo.csv`):
 
-**Chequeo de honestidad: ¿qué pasa si se escala a un nivel de apalancamiento comparable?** (mismo ejercicio que separó dirección de tamaño en 9.14): escalando la posición del Momentum Transformer por un factor constante (sin refitear nada) hasta un uso de apalancamiento más parecido al de los baselines:
+| Fuente FX | Moneda × commodity | Corr. contemporánea | **Corr. operable** | Sharpe bruto [IC95] | Sharpe neto [IC95] |
+|---|---|---|---|---|---|
+| FRED H.10 | AUD × cobre | 0.448 | **0.012** | 0.07 [-0.40, 0.58] | -0.39 [-0.87, 0.12] |
+| Yahoo corregido | AUD × cobre | 0.344 | **0.007** | 0.05 [-0.41, 0.52] | -0.42 [-0.89, 0.05] |
+| FRED H.10 | CAD × cobre | 0.384 | **0.003** | 0.08 [-0.42, 0.58] | -0.58 [-1.08, -0.09] |
+| Yahoo corregido | CAD × cobre | 0.297 | **-0.013** | -0.11 [-0.57, 0.37] | -0.78 [-1.24, -0.29] |
+| FRED H.10 | MXN × cobre | 0.314 | **0.015** | 0.20 [-0.27, 0.66] | -0.86 [-1.34, -0.40] |
+| FRED H.10 | NOK × WTI | 0.292 | **0.020** | -0.10 [-0.58, 0.39] | -1.80 [-2.30, -1.28] |
+| Yahoo corregido | NOK × WTI | 0.226 | **-0.122** | -0.22 [-0.60, 0.31] | -1.34 [-2.02, -1.03] |
+| FRED H.10 | ZAR × platino | 0.363 | **-0.006** | -0.45 [-0.93, 0.04] | -2.13 [-2.62, -1.65] |
+| FRED H.10 | ZAR × oro | 0.287 | **0.003** | 0.14 [-0.37, 0.66] | -1.54 [-2.05, -1.02] |
+| FRED H.10 | BRL × soja | 0.229 | **0.008** | 0.17 [-0.32, 0.70] | -2.40 [-2.89, -1.88] |
 
-| Factor de escala | Retorno total | Sharpe | % días saturado |
-|---|---|---|---|
-| 1.0× (default) | 36.6% | 5.29 | 2.4% |
-| 1.5× | 54.5% | 5.39 | 15.6% |
-| 2.0× | 68.3% | 5.36 | 30.2% |
-| 2.7× | 82.0% | 5.42 | 42.4% |
-| **3.0×** | **85.3%** | **5.42** | **47.1%** |
+Con una fuente de precios limpia y de hora conocida, el patrón es inequívoco: correlación contemporánea de 0.23-0.45, operable de -0.01 a 0.02, y ninguna regla con Sharpe bruto distinguible de cero. (Las variantes originales del proyecto con estos mismos pares reportaban Sharpe de 4-5.)
 
-**A 3× de escala, el Momentum Transformer supera el criterio de éxito (+85.3% ≥ +83.0%) con el Sharpe más alto de todo el proyecto (5.42, contra 4.57 del mejor baseline) — y sigue estando saturado en el límite de apalancamiento menos de la mitad de los días (47.1%), contra el ~97% casi constante de todas las estrategias Kelly.** Es decir: incluso comparado en el terreno más favorable a los baselines (apalancamiento similar), el Momentum Transformer no solo iguala el retorno, lo hace con una señal genuinamente mejor (menos dependiente de estar siempre al límite).
+**El argumento de 9.14 estaba invertido.** La versión original descartó la contaminación porque el efecto estaba "concentrado en el rezago +1 y no en el 0". Eso solo es válido si ambas series están en el mismo reloj. Con la barra FX corrida ~17 horas hacia atrás respecto del settlement, el "rezago +1" es justamente el contemporáneo: la concentración en +1 era la firma del artefacto. El propio texto original de 9.14 mencionaba que yfinance reporta `HG=F` y `CLP=X` en husos horarios distintos (America/New_York vs. Europe/London) — y aun así se prefirió el escaneo de rezagos a reconstruir los horarios, que era exactamente lo que hacía falta.
 
-**Lectura honesta y sin forzar la narrativa**: con la métrica exacta que pide el Issue (retorno total, configuración default) la respuesta es NO. Con la métrica que este mismo proyecto ya estableció como la confiable en 9.14 (Sharpe, más el chequeo de qué tan seguido se satura el apalancamiento) la respuesta es que el Momentum Transformer es la **mejor estrategia de todo el proyecto hasta ahora** — mejor dirección, mejor Sharpe, muchísimo menor drawdown, y sin depender de apostar el capital al límite casi todos los días. Ambas lecturas son ciertas a la vez; se documentan las dos en vez de elegir la que se ve mejor. Un Sharpe de 5.4 es alto — mismo estándar de sospecha que el resto del proyecto — pero está evaluado sobre el mismo periodo de test de 300 días (jul-2025 a sep-2026) que todos los demás números de esta sección: **no se repitió el chequeo de múltiples regímenes históricos (Fase 2) para el Momentum Transformer** por restricción de tiempo — queda como limitación explícita, no verificada, no oculta.
+**La corrección** (`codigos/alineacion_temporal.py`, un único módulo que usan todos los scripts corregidos): cada observación se ubica en su timestamp real (UTC); un dato de commodity solo puede usarse en una decisión FX si su settlement ocurrió **estrictamente antes** del timestamp del precio FX al que se entra. Para barras Yahoo FX y settlements de EE.UU. eso equivale a usar el commodity del último settlement con fecha < D (no ≤ D) en la fila FX D; para FRED H.10 (mediodía) resulta la misma regla. Equivalentemente: la fila Yahoo FX D se reetiqueta a la fecha hábil anterior. Chequeo de cordura de que la alineación es la correcta: después de la corrección, la correlación fuerte aparece en el rezago 0 (contemporáneo) y no en el +1 (9.13, 9.14, 9.31). También se eliminan los precios repetidos de Yahoo (feriados/huecos de pares poco líquidos, 106 días en CLP=X, 226 en PEN=X) antes de calcular retornos: no hubo cotización nueva a la que operar.
 
-**Limitaciones honestas de esta fase**:
-- No se validó en múltiples regímenes históricos (a diferencia de los 10 pares de Fase 1/2) — el resultado podría ser parcialmente específico del régimen 2025-2026.
-- La Variable Selection Network del ancla es interpretable por diseño (pesos de selección por feature, por eso el nombre) — este port guarda esos pesos (`vsn_weights` en el forward) pero no se analizaron en esta sesión; queda como trabajo futuro con valor real (ver qué variable pesa más en cada régimen).
-- No se hizo búsqueda de hiperparámetros (hidden_size=32, lookback=20, 1500 steps eran los mismos usados en Fase 3 para comparabilidad, no un óptimo buscado).
-- Es un port fiel del MECANISMO (VSN + SharpeLoss), no una reproducción exacta del paper completo (que incluye detección de cambio de régimen vía `changepoint_detection.py`, no portada — fuera de alcance de esta fase).
+**Por qué los datasets NHITS se realinearon en vez de regenerarse** (`63_realinear_datasets_rl_diarios.py`): en los datasets de 26/35/39/45-47, el forecast NHITS, GARCH, MACD/RSI y el mín/máx de cada fila D se calculan solo con la serie FX hasta el precio de esa fila — información disponible a las ~20:00 NY de D-1, sin relación con el commodity. Su timestamp real cambia de nombre pero no su contenido ni su causalidad. Lo único mal alineado eran `copper_ret_1d`/`copper_mom_5d`, que se recalcularon con la regla estricta (se verificó que las columnas `nhits_*` quedan idénticas). Regenerar NHITS (~50 min por dataset, sin semilla en los originales) solo habría agregado ruido de reentrenamiento sin corregir nada. De paso se recalculó `y_next` desde la serie cruda (en 3 filas el dataset saltaba un día y `y_next` era el precio de dos días después).
+
+#### 9.35.2 Bug de costos
+
+En 22, 27, 28, 32, 33, 36/37, 40, 42 y 48-50 el costo era un "slippage" de 0.05% cobrado **una sola vez, solo al entrar y solo cuando la posición cambiaba** respecto del día anterior (27:206, 28:85, 32:254, 33:84, 22:88). Pero en los entornos diarios cada decisión es una operación completa (se abre al precio de la fila y se cierra al día siguiente, o al tocar TP/SL): una ida+vuelta por día. Con el apalancamiento del risk sizing (notional/capital mediano de 3.8x en CLP, 5.9x en AUD) ese costo omitido es decisivo. Ya con los datos contaminados, la auditoría (`auditoria_codigo/costos.py`) mostraba que el spread ida+vuelta de breakeven de la regla del cobre en CLP era 0.20% del notional (0.17% para el PPO, 0.16% para la regla en AUD).
+
+Corrección: `27`/`32`/`36` cobran el spread ida+vuelta completo sobre el notional **en cada operación** (bloques `CORRECCIÓN (2026-09-23)` en el código), con supuestos por instrumento documentados en `costos_y_estadistica.py`: USD/CLP 0.15% (rango 0.10-0.20%), AUD/USD 0.02%, NZD/USD 0.03%, USD/CAD 0.02%, USD/NOK 0.08% (0.05-0.10%), USD/ZAR 0.10% (0.07-0.15%), USD/BRL 0.15%, USD/MXN 0.05%, USD/COP y USD/PEN 0.20%, G10 0.01-0.03%. Son supuestos, no spreads medidos; por eso cada resultado se reporta también bruto (spread 0), con la cota inferior "rotación" (solo se paga al cambiar de posición, como si se mantuviera la posición entre días) y con sensibilidad a una grilla de spreads 0-0.30%.
+
+#### 9.35.3 Ejecución no realizable
+
+Aun sin el problema de etiquetas, entrar "al cierre del mismo día que genera la señal" no es operable si la señal se conoce después de ese precio. Con la alineación corregida, la única prueba honesta es: señal = retorno del commodity hasta el settlement de t; entrada en el primer precio FX posterior (~20:00 NY de t = fila Yahoo original t+1); salida en el siguiente precio FX (fila original t+2). Eso es lo que implementan todos los scripts corregidos. Se pierden las ~7 horas entre el settlement y el precio de entrada, que es justamente donde el peso reacciona.
+
+#### 9.35.4 Bug de alineación del forecast del TFT
+
+`56_tft_panel_walkforward.py` (líneas 68-73, 102, 110-111) unía por `ds` la fila de `cross_validation` con la fila de test: pero la fila con `ds`=D contiene el pronóstico del retorno que **termina** en D (hecho con información hasta el cutoff D-1), y el backtest lo aplicaba al retorno D→D+1. Cada posición usaba el pronóstico del retorno de ayer. La auditoría mostró que solo realinear eso llevaba el Sharpe de -1.18 a ~+3.8 — con el panel todavía contaminado, así que ese +3.8 tampoco era real. Corregido en `66_tft_panel_corregido.py` (ver 9.33), con chequeo explícito: la correlación entre el objetivo del pronóstico y el retorno realizado de la decisión es 1.0.
+
+#### 9.35.5 Pruebas múltiples, una sola semilla, pseudo fuera de muestra
+
+- **Pruebas múltiples sobre la misma ventana**: más de 35 configuraciones (reglas, Kelly, PPO por N, h, moneda, TP adaptativo, TFT, Momentum Transformer, factores de escala) se evaluaron y compararon sobre los mismos 300 días de test (2025-06/07 a 2026-09). El error estándar de un Sharpe anualizado con T=300 días es ~0.93 (el "Sharpe 4.39" original tenía IC95 ≈ [2.6, 6.2]), y el máximo esperado de 35-40 Sharpe de estrategias **sin ninguna señal** es ~2.0 (Bailey & López de Prado 2014). Ninguna sección lo reportaba. Ahora cada Sharpe va con IC95 por bootstrap de bloques.
+- **Una semilla**: todo PPO usaba `SEED=42`; NHITS no tenía semilla. Los agentes corregidos se entrenan con 3 semillas (1 en el subconjunto de la grilla N×h, por cómputo) y se reporta el rango.
+- **Fase 1/2 no fuera de muestra**: los regímenes de Fase 2 estaban dentro de la muestra que eligió pares y signo; el SPA se aplicó solo a los sobrevivientes (no al universo explorado); 25 heredaba de 22 el signo de la regla del cobre fijado mirando toda la muestra. Corregido en 59, 61 y 62: selección y signo solo con datos previos a cada período de test; SPA sobre el universo.
+- **El argumento del "escalado 3×" de 9.34**: escalar la posición por una constante no cambia el Sharpe (salvo por el clip a ±1); el factor 3× se eligió mirando el test para cruzar el criterio de +83%; y el CSV que lo respalda (`fase4_momentum_transformer_escalado_apalancamiento.csv`) no lo produce ningún script del repo. Se elimina.
+- **Menores**: `UMBRAL_SIMPLE` de 28 (líneas 176-177) usaba la mediana de |forecast| de todo el dataset, incluido el test (ahora: mediana del train de cada ventana); `y_next` calculado antes del `dropna` en 26 (140-141); buy-and-hold sin apalancar comparado contra estrategias apalancadas 3.8-5.9x (el Sharpe es comparable, el retorno total no — se aclara en cada tabla).
+
+#### 9.35.6 Un segundo artefacto de datos: autocorrelación negativa espuria en precios Yahoo de pares poco líquidos
+
+Al revisar resultados sospechosamente buenos después de la corrección (Kelly en USD/PEN: +1377%, Sharpe 10.8; Kelly en CLP 2015-2016: Sharpe 5.5), apareció que el retorno diario de los precios de Yahoo de pares emergentes poco líquidos tiene autocorrelación de primer orden **negativa**: PEN=X -0.44, COP=X -0.30, ZAR=X -0.23, CLP=X -0.18, BRL=X -0.15 — contra -0.03 a 0.01 en pares líquidos (EUR, JPY, CAD, AUD) y ~0 en las series FRED de esas mismas monedas (BRL 0.01, ZAR 0.01, MXN 0.03). Es ruido de cotización que se revierte al día siguiente. Cualquier regla que use `retorno_1d` (Kelly, y en parte el PPO, cuyo estado incluye `retorno_1d`) puede "ganar" sobre esos precios sin que eso sea operable. No se construyó nada sobre esto (sería una configuración nueva elegida mirando el test); se documenta como limitación de los datos y como explicación de los positivos brutos que aparecen en 9.14/9.17.
+
+#### 9.35.7 Qué se cambió en el código
+
+- **Nuevo**: `codigos/alineacion_temporal.py` (módulo central de timestamps y merge estricto), `codigos/costos_y_estadistica.py` (spreads, IC del Sharpe, Sharpe máximo esperado bajo H0), `codigos/validacion_timestamp/` (scripts de la auditoría con rutas adaptadas) y los scripts corregidos `58` (evidencia), `59` (9.13/9.14 CLP, 9.17 paso 1), `60` (panel, 9.14), `61` (9.31), `62` (9.32), `63` (realineado de datasets NHITS), `64`+`65` (PPO de 9.17/9.20/9.23/9.24/9.26/9.28), `66` (9.33) y `67` (9.34).
+- **Corregido en el lugar** (bloques `CORRECCIÓN (2026-09-23)`): los entornos `27`, `32` y `36` cobran el spread ida+vuelta en cada operación.
+- **Marcados como invalidados/superados** (encabezado `INVALIDADO / SUPERADO`, sin cambios de lógica, para conservar la historia): `21` (parte diaria), `22`, `23`, `25`, `26`, `28`, `33`, `35`, `37`, `39`, `40`, `42`, `45`-`50`, `52`-`57`. Sus CSV originales se conservan en `datos/resultados/` como registro; los corregidos llevan el prefijo `correccion_` (o `errata_timestamp_`). Datasets nuevos: `datos/bases/panel_fx_diario_alineado.csv`, `datos/resultados/dataset_entrenamiento_rl_diario*_alineado.csv`.
+
+#### 9.35.8 Registro de los números originales (inválidos) frente a los corregidos
+
+| Sección | Resultado titular original (inválido) | Corregido (neto de costos salvo indicación) |
+|---|---|---|
+| 9.13 | `copper_ret_1d` vs. retorno siguiente de USD/CLP: r = -0.256 | r operable = -0.078; el -0.254 es el contemporáneo |
+| 9.14 | Rezago 0 = -0.021, +1 = -0.254 → "timestamp limpio" | Reloj consistente: rezago 0 = -0.25 (Yahoo corregido) a -0.46 (horario); +1 ≈ 0 a -0.07 |
+| 9.14 | Kelly con cobre +86.2% / Sharpe 4.57; umbral cobre +83.5% / 4.44 | Kelly -30.1% / -2.43 [-4.10, -0.82]; umbral -28.2% / -2.25 [-3.74, -0.75]; bruto 0.69-0.78 (IC incluye 0) |
+| 9.14 | Panel: AUD/CAD/NZD 0.31-0.37 "predictivo" | Mismos valores, pero contemporáneos; operable ≈ 0 en 14 pares (CLP 0.08) |
+| 9.14 | Pooled +67.9% / 3.77 vs. solo-CLP +83.0% / 4.42 | Pooled -1.79 vs. solo-CLP -2.27 (brutos 1.26 / 0.79, IC incluyen 0) |
+| 9.17 p.1 | Sharpe 2.07-5.42 en 4 períodos | Umbral cobre neto -2.25 a -0.27 en los 4; Kelly neto positivo solo en 2015-2016 (3.35), explicado por el artefacto de autocorrelación de CLP=X (9.35.6) |
+| 9.17 p.2 | PPO +397.1% / 3.88; umbral cobre +532.3% / 4.39 | PPO: 8-24 operaciones, Sharpe -0.90 a -2.14 (3 semillas); umbral cobre -65.5% / -2.37 |
+| 9.20 | Holding N=1..5: PPO 3.88 → 1.31; razón PPO/cobre 0.88 → 0.51 | PPO neto: N=1 -1.55, N=2 -0.04, N=3 -0.70, N=5 0.79 (medias de 3 semillas, IC incluyen 0; brutos dentro del control al azar) |
+| 9.23 | Umbral cobre 3.73; PPO TP h1 2.13; TP adaptativo 2.04 | -0.89; -1.04 (media); -0.93 (media) |
+| 9.24 | "h2 sistemáticamente peor"; mejor N=7/h4 Sharpe 2.73 | h2 no es el peor en ninguna fila; N=7/h4 -0.29; 12/12 IC incluyen 0 (subconjunto) |
+| 9.26 | Dos zonas buenas (N=5-7 y N=14), Sharpe ~2 | N=5-7 negativos; N=14 0.49-0.84 con 20 decisiones (IC incluyen 0) |
+| 9.28 | AUD umbral +692.0% / 4.92; NZD +397.7% / 3.84; CAD +33.1% / 0.86 | AUD +47.9% / 1.11 [-0.78, 2.90] (ver caveats); NZD -0.58; CAD 0.07; PPO negativo en las 3 |
+| 9.31 | 11/90 sobreviven FDR en rezago +1; SPA p = 0.0 (10 sobrevivientes) | Los 10 están en el rezago 0 (contemporáneo); 1 operable (NOK×WTI, r=-0.12, signo opuesto); SPA sobre 90 estrategias: p = 0.54 bruto, 1.00 neto |
+| 9.32 | 9/10 pares con Sharpe > 0 en 3 regímenes | Selección previa: 0, 0 y 2 pares; universo: Sharpe bruto medio -0.12 a 0.05, neto -1.1 a -1.9 |
+| 9.33 | TFT panel -21.8% / -1.65 (forecast desalineado); realineado ~+3.8 (auditoría) | Panel -3.67 (bruto -0.65); solo-CLP -3.49 (bruto -0.46) |
+| 9.34 | Momentum Transformer +36.6% / 5.29; "3× → +85.3% / 5.42" | Bruto 0.81 (5 semillas, -0.51 a 1.41); neto -0.55 (rotación) a -1.91; sin escalado |
+
+#### 9.35.9 Lo que no se rehízo, y limitaciones que siguen
+
+- **Grilla N×h (9.24/9.26)**: se rehizo un subconjunto de 12 de las 35 combinaciones, con una sola semilla; no se rehicieron h3/h5 ni N=10/12/20 (≈15 min de PPO por combinación y semilla). Con 12/12 intervalos cruzando el cero no hay indicio de que las combinaciones faltantes cambien la conclusión, pero no está verificado.
+- **Semillas**: 3 por configuración de PPO (no 5) y 1 para el TFT (~3.6 h por variante); 5 para el Momentum Transformer. NHITS no se regeneró (se realineó, 9.35.1), así que su falta de semilla sigue presente en los datasets.
+- **Simulador de TP/SL con precios de cierre**: sesgado a favor (Sharpe bruto medio con dirección al azar de ~0 a +1.3 según la configuración). Se cuantificó con controles al azar y variantes sin TP/SL, pero no se corrigió: haría falta data intradía confiable, que para CLP no hay.
+- **Spreads**: supuestos documentados, no medidos; la entrada corregida (~20:00 NY) es un horario de baja liquidez en CLP/BRL/ZAR, donde el spread real probablemente es mayor que el supuesto.
+- **Una sola ventana de test** (300 días, 2025-06 a 2026-09) para todo lo que usa los datasets NHITS; la validación histórica (59) y los regímenes (62) sí cubren otros períodos, solo para reglas simples.
+- **Calidad de datos Yahoo**: además del timestamp, la autocorrelación negativa espuria de pares poco líquidos (9.35.6) sigue en los datos; no se construyó ninguna corrección, solo se documenta dónde infla resultados.
+- **Lo que sí sigue en pie**: la correlación **contemporánea** commodity-moneda (cobre con CLP/AUD/NZD/CAD, petróleo con NOK, platino/oro con ZAR, soja con BRL) es real y ordenada como predice Chen & Rogoff (2003) — solo que no es operable a frecuencia diaria con datos de cierre.
 
 ## Reproducibilidad
 
-Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), la extensión a ventanas de holding más largas del Issue #11 (`41`-`44`), la extensión a monedas commodity del Issue #12 (`45`-`50`), y la extensión a commodities nuevos (petróleo, oro, platino, soja, hierro) y monedas NOK/ZAR/BRL del Issue #13 (`51`-`57`) — ver `README.md` del repositorio para el detalle de cada uno y cómo correrlos), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
+Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), la extensión a ventanas de holding más largas del Issue #11 (`41`-`44`), la extensión a monedas commodity del Issue #12 (`45`-`50`), y la extensión a commodities nuevos y monedas NOK/ZAR/BRL del Issue #13 (`51`-`57`) — ver `README.md` del repositorio para el detalle de cada uno), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
+
+**Corrección del 2026-09-23 (9.35)**: los resultados diarios vigentes los producen los scripts `58`-`67` más los módulos `alineacion_temporal.py` y `costos_y_estadistica.py`; los scripts originales afectados llevan un encabezado `INVALIDADO / SUPERADO` y se conservan como registro. Orden para reproducir, desde `codigos/`:
+
+1. `58_validacion_timestamp.py` (evidencia de la errata; usa `datos/bases/validacion_timestamp/`, sin red).
+2. `59_senal_cobre_clp_corregida.py` (9.13, 9.14 CLP, 9.17 paso 1) y `60_panel_fx_corregido.py` (panel de 9.14; genera `datos/bases/panel_fx_diario_alineado.csv`, que usan 61, 62, 66 y 67).
+3. `61_screening_spa_universo_corregido.py` (9.31) y `62_regimenes_seleccion_previa_corregido.py` (9.32).
+4. `63_realinear_datasets_rl_diarios.py` (datasets `*_alineado.csv`), luego `64_entrenar_ppo_diario_corregido.py --lote A,B,C,D` (se puede repartir en procesos con `--parte i --n_partes k`; ~39 corridas de ~13-16 min) y `65_resumen_rl_diario_corregido.py` (9.17, 9.20, 9.23, 9.24, 9.26, 9.28).
+5. `66_tft_panel_corregido.py --modo panel`, `--modo solo_clp` (~3.6 h cada uno) y `--resumen` (9.33); `67_momentum_transformer_corregido.py` (9.34, ~1 h).
+
+Los logs de estas corridas están en `datos/resultados/_log_correccion_*.txt`.

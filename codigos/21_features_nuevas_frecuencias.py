@@ -1,3 +1,14 @@
+# INVALIDADO / SUPERADO (2026-09-23) - la parte DIARIA (copper_ret_1d/copper_mom_5d vs retorno siguiente): ver script 59 (tabla correccion_clp_features_diarias_913.csv).
+# Motivo: artefacto de timestamp (la barra diaria Yahoo FX con fecha D es el precio
+# de ~20:00 NY de D-1, el cierre de un futuro de commodity con fecha D es su
+# settlement de ~13:00-14:30 ET de D; el merge_asof(direction='backward') por
+# fecha usaba informacion posterior al precio de entrada) + costos cobrados una
+# sola vez al cambiar de posicion en vez de ida+vuelta en cada operacion. Ver
+# alineacion_temporal.py, costos_y_estadistica.py y la errata en 9.35 del paper.
+# Se conserva sin cambios de logica como registro de los numeros originales; no
+# reproduce exactamente sus CSV si se vuelve a correr despues de la correccion de
+# costos en 27/32/36.
+#
 # Hoja de ruta del radar-baseline (2026-09-13), seguimiento a 9.11: el chequeo
 # de correlacion de 19_features_nuevas_validacion.py se hizo a frecuencia
 # SEMANAL (la que usa el agente RL) y ninguna de las 5 candidatas supero

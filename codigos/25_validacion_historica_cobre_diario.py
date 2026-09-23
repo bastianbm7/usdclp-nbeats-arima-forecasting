@@ -1,3 +1,14 @@
+# INVALIDADO / SUPERADO (2026-09-23) - la validacion historica (ademas el signo de la regla venia fijo de toda la muestra): ver script 59.
+# Motivo: artefacto de timestamp (la barra diaria Yahoo FX con fecha D es el precio
+# de ~20:00 NY de D-1, el cierre de un futuro de commodity con fecha D es su
+# settlement de ~13:00-14:30 ET de D; el merge_asof(direction='backward') por
+# fecha usaba informacion posterior al precio de entrada) + costos cobrados una
+# sola vez al cambiar de posicion en vez de ida+vuelta en cada operacion. Ver
+# alineacion_temporal.py, costos_y_estadistica.py y la errata en 9.35 del paper.
+# Se conserva sin cambios de logica como registro de los numeros originales; no
+# reproduce exactamente sus CSV si se vuelve a correr despues de la correccion de
+# costos en 27/32/36.
+#
 # Paso 1 del Issue #5 (reconstruccion RL diaria), pedido explicitamente por el
 # Issue antes de comprometerse a la reconstruccion completa: el backtest de
 # 22_kelly_diario_cobre.py (+86.2% / Sharpe 4.57, corregido a +1.9% con sizing

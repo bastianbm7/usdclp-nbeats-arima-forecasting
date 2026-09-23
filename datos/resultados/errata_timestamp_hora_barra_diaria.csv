@@ -1,0 +1,5 @@
+ticker,hora_utc_que_mejor_reproduce_la_barra_diaria,corr_retornos,n_dias
+CLP=X,10,0.5747156322900291,517
+AUDUSD=X,0,0.9728107280409677,517
+NOK=X,0,0.9721518176910564,517
+HG=F,17,0.9852604733210026,503
