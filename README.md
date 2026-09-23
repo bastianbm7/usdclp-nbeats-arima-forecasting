@@ -234,7 +234,8 @@ codigos/
 ├── 80_datos_cartera_fx_mensual.py  # spot FRED H.10 (mediodia NY) de 13 monedas + CLP=X Yahoo limpio, tasas 3m OECD con 2 meses de rezago -> datos/bases/cartera_fx_mensual.csv
 ├── cartera_fx.py                 # motor: retorno en exceso con carry (CIP), carry/TSMOM/combinacion, vol targeting con datos pasados, costo sobre turnover
 ├── 81_cartera_fx_seleccion_pre_holdout.py  # 21 variantes evaluadas solo con retornos < 2025-01-01, registro de pruebas, eleccion de la configuracion
-└── 82_cartera_fx_holdout.py      # apertura UNICA del hold-out (2025-01..2026-08) para la configuracion elegida por 81
+├── 82_cartera_fx_holdout.py      # apertura UNICA del hold-out (2025-01..2026-08) para la configuracion elegida por 81
+└── 83_cartera_fx_stop_take_profit.py  # extension: stop-loss/take-profit diario dentro del mes (33 variantes, sin hold-out) - ninguna mejora el Sharpe
 
 datos/
 ├── bases/        # CSV crudo de USD/CLP

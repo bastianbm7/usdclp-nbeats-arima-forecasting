@@ -78,3 +78,36 @@ fecha_registro,issue,script,prueba,frecuencia,metrica,valor,n,usa_holdout,nota
 2026-09-23 15:48,#15,81_cartera_fx_seleccion_pre_holdout.py,ew,mensual,sharpe_neto_pre_holdout,0.1409,300,False,"benchmark; bruto 0.14; IC95 neto [-0.28,0.57]; 2000-01-31..2024-12-31"
 2026-09-23 15:48,#15,81_cartera_fx_seleccion_pre_holdout.py,combo[carry_n2_vt5+tsmom_k6_vt5]_vt5_sinBRL,mensual,sharpe_neto_pre_holdout,0.5171,300,False,"sensibilidad (sin BRL); bruto 0.58; IC95 neto [0.12,0.94]; 2000-01-31..2024-12-31"
 2026-09-23 15:49,#15,82_cartera_fx_holdout.py,combo[carry_n2_vt5+tsmom_k6_vt5]_vt5,mensual,sharpe_neto_holdout,0.4679,20,True,"APERTURA UNICA del hold-out 2025-01-31..2026-08-31; bruto 0.56; IC95 neto [-1.09,2.74]; config elegida por 81 entre 21 pruebas"
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL - / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.5303307784670199,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL - / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.6106474198199421,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 1.0 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.43853749043293294,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 1.0 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.3374450945913448,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 1.0 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.42762202877415645,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 1.5 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.4880345720765688,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 1.5 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.39161554704267176,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 1.5 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.477818764381446,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 2.0 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.5544511949997815,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 2.0 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.4621522074630046,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Carry | SL 2.0 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.5449811839316229,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL - / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.3591736793535145,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL - / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.4386322762695692,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 1.0 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.31197251452294017,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 1.0 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.24135382459882107,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 1.0 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.30505671875302653,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 1.5 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.28831124750082254,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 1.5 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.2190545184912904,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 1.5 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.2814621199502761,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 2.0 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.42318330916089936,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 2.0 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.3541304026377463,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Momentum 6m | SL 2.0 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.43391217633986484,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL - / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.677148065937188,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL - / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.7712975373512718,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 1.0 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.5086576945732474,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 1.0 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.4084797750437893,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 1.0 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.49483156902471814,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 1.5 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.6118114944390747,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 1.5 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.4982714799006176,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 1.5 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.5997120559574985,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 2.0 / TP -,mensual (stop diario),sharpe_neto_pre_holdout,0.6700344659448355,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 2.0 / TP 1.5,mensual (stop diario),sharpe_neto_pre_holdout,0.560525070097851,300,False,extension stop-loss/take-profit
+2026-09-23 19:58,#15,83_cartera_fx_stop_take_profit.py,Combinacion 50/50 | SL 2.0 / TP 2.5,mensual (stop diario),sharpe_neto_pre_holdout,0.6588254401998146,300,False,extension stop-loss/take-profit

@@ -1045,6 +1045,25 @@ La prima se concentra en 2000-2008, el período en que la literatura la descubri
 - **Sharpe deflactado formal** ([Issue #17](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/17)).
 - **Reevaluar la misma configuración** con más meses de hold-out, sin cambiarla. Es la única forma de ganar poder estadístico sin gastar el hold-out.
 
+**Extensión: stop-loss y take-profit dentro del mes** (`83_cartera_fx_stop_take_profit.py`, pedida por Bastián para ver si se evitan las caídas del carry). La cartera se arma igual que en 81 y se marca a mercado cada día hábil (mediodía NY) con el último precio conocido. Si el retorno acumulado del mes toca -k·σ (stop) o +k·σ (take-profit), con σ = 5%/√12 = 1.44%, se cierra todo **al día hábil siguiente** y se queda en caja hasta el rebalanceo. La grilla quedó fijada antes de correr: k_stop ∈ {1, 1.5, 2}, k_take ∈ {1.5, 2.5}, 33 variantes, solo datos < 2025. El hold-out no se reabre.
+
+| 2000-2024, neto | Sharpe [IC95] | Máx. drawdown | Peor mes | 2020 feb-mar | Stops/año |
+|---|---|---|---|---|---|
+| Carry sin stop | **0.62** [0.17, 1.10] | -12.8% | -7.6% | -9.5% | — |
+| Carry, stop 2σ | 0.55 | -17.5% | -4.4% | -6.4% | 0.6 |
+| Carry, stop 1σ | 0.44 | -24.3% | -4.4% | -6.3% | 2.2 |
+| Momentum sin stop | **0.43** | -18.6% | -5.0% | +5.3% | — |
+| Momentum, stop 2σ | 0.42 | -17.3% | -5.2% | +5.3% | 0.5 |
+| Combinación sin stop | **0.78** [0.36, 1.22] | -14.0% | -4.2% | -3.1% | — |
+| Combinación, stop 2σ | 0.67 | -16.3% | -5.2% | -4.9% | 0.4 |
+| Combinación, stop 1σ | 0.51 | -20.8% | -3.2% | -3.0% | 2.8 |
+
+**Ninguna de las 33 variantes mejora el Sharpe de su estrategia base.** Todos los take-profit lo empeoran: cortan los meses buenos de una prima que se gana de a poco.
+
+El stop achica el peor mes del carry (-7.6% → -4.4%), pero **agranda la caída máxima** (-12.8% → -17.5% / -24.3%). La razón es doble. Las caídas del carry son rápidas (marzo 2020 se concentra en pocos días), así que el stop dispara después de la mayor parte de la pérdida. Y luego queda afuera durante el rebote, para volver a entrar a fin de mes. Además da 1-3 falsas alarmas por año que cuestan spread y retorno.
+
+La protección que sí funciona ya está incluida: la volatilidad objetivo, que achica la posición cuando sube el riesgo, y la combinación con momentum, que gana en esas mismas crisis.
+
 ## Reproducibilidad
 
 Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de precio; `09` en adelante para la extensión de trading con RL, incluyendo la reconstrucción a frecuencia diaria del Issue #5 (`25`-`28`), el agente multi-activo del Issue #6 (`29`-`31`), el holding de N días del Issue #9 (`32`-`33`), el chequeo de features semanales y el take-profit adaptativo (`34`-`38`), el barrido de take-profit por horizonte del Issue #10 (`39`-`40`), la extensión a ventanas de holding más largas del Issue #11 (`41`-`44`), la extensión a monedas commodity del Issue #12 (`45`-`50`), y la extensión a commodities nuevos y monedas NOK/ZAR/BRL del Issue #13 (`51`-`57`) — ver `README.md` del repositorio para el detalle de cada uno), y todos los resultados numéricos y gráficos citados en este documento están versionados en `datos/resultados/`.
