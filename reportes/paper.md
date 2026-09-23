@@ -901,6 +901,7 @@ Al revisar resultados sospechosamente buenos después de la corrección (Kelly e
 | 9.32 | 9/10 pares con Sharpe > 0 en 3 regímenes | Selección previa: 0, 0 y 2 pares; universo: Sharpe bruto medio -0.12 a 0.05, neto -1.1 a -1.9 |
 | 9.33 | TFT panel -21.8% / -1.65 (forecast desalineado); realineado ~+3.8 (auditoría) | Panel -3.67 (bruto -0.65); solo-CLP -3.49 (bruto -0.46) |
 | 9.34 | Momentum Transformer +36.6% / 5.29; "3× → +85.3% / 5.42" | Bruto 0.81 (5 semillas, -0.51 a 1.41); neto -0.55 (rotación) a -1.91; sin escalado |
+| 9.11 / 9.13 (semanal y mensual, agregado 2026-09-23 en 9.36) | Cobre semanal `copper_ret_1s` ≈ -0.10, `copper_mom_4s` -0.055 (muestra 2010-2026; -0.082 en el dataset de 9.11); mensual `copper_ret_1m` 0.105 | +0.041 y +0.016 (semanal: la contaminación era la misma, diluida en 5 días); mensual 0.090, nunca significativo. La conclusión ("no supera el umbral") no cambia |
 
 #### 9.35.9 Lo que no se rehízo, y limitaciones que siguen
 
@@ -910,7 +911,55 @@ Al revisar resultados sospechosamente buenos después de la corrección (Kelly e
 - **Spreads**: supuestos documentados, no medidos; la entrada corregida (~20:00 NY) es un horario de baja liquidez en CLP/BRL/ZAR, donde el spread real probablemente es mayor que el supuesto.
 - **Una sola ventana de test** (300 días, 2025-06 a 2026-09) para todo lo que usa los datasets NHITS; la validación histórica (59) y los regímenes (62) sí cubren otros períodos, solo para reglas simples.
 - **Calidad de datos Yahoo**: además del timestamp, la autocorrelación negativa espuria de pares poco líquidos (9.35.6) sigue en los datos; no se construyó ninguna corrección, solo se documenta dónde infla resultados.
+- **Línea semanal de RL (9.4-9.12)**: sus variables derivadas del precio de USD/CLP no dependen del timestamp (variable y objetivo en el mismo reloj); las de cobre/tasas sí, y se re-verificaron en 9.36. Su costo (0.05% solo al cambiar de posición, `11`/`14`) también es menor que el realista, pero ese sesgo favorece a las estrategias, que igual perdían o no operaban: rehacerlo no puede cambiar la conclusión, así que no se rehízo.
 - **Lo que sí sigue en pie**: la correlación **contemporánea** commodity-moneda (cobre con CLP/AUD/NZD/CAD, petróleo con NOK, platino/oro con ZAR, soja con BRL) es real y ordenada como predice Chen & Rogoff (2003) — solo que no es operable a frecuencia diaria con datos de cierre.
+
+### 9.36 Issue #14: variables no probadas del CLP a frecuencia semanal/mensual, con alineación corregida (2026-09-23)
+
+Después de la errata, el camino que queda no es buscar más transformaciones del precio a diario: el spread de USD/CLP (0.15% ida+vuelta) cuesta ~37% anual del notional operando todos los días, ~7.8% semanal y ~1.8% mensual. El [Issue #14](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/14) prueba variables de otro tipo (régimen de riesgo global, dólar global, tasas, acciones chilenas, petróleo) a frecuencia semanal y mensual, con un protocolo fijado antes de mirar resultados (`protocolo_evaluacion.py`, [Issue #17](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/17)):
+
+- **Hold-out intocable desde 2025-01-01**: nada de lo que se elige usa datos posteriores; se abre una sola vez y solo para una variable que cumpla el criterio.
+- **Timestamp real de cada dato** (`69_variables_externas_clp.py`): VIX al cierre (16:15 ET), S&P 500 / EEM / ECH a las 16:00 ET, WTI al settlement (14:30 ET), bono a 2 años a las 17:00 ET, índice amplio del dólar de la Fed con 7 días de rezago (se publica semanalmente), tasa interbancaria chilena (OECD) con 3 meses de rezago. Cada variable entra con el último dato conocido **estrictamente antes** del precio FX de la fila (`alineacion_temporal.valor_conocido`).
+- **Registro de todas las pruebas** (`datos/resultados/registro_pruebas.csv`) y criterio de supervivencia: q-valor FDR < 0.05 sobre todo el universo, |r| ≥ max(0.11, 2/√n) y mismo signo en las dos mitades de la muestra previa al hold-out.
+
+**Paso previo — re-verificación del cobre y las tasas semanales/mensuales** (`68_features_semanales_mensuales_corregido.py`). La errata no los había rehecho. En 19/21 el cobre se unía por la etiqueta del período, de modo que la fila semanal de CLP (~20:00 NY del jueves) recibía el settlement del viernes: la misma contaminación de 9.35, diluida en cinco días.
+
+| Variable (USD/CLP, 2010-2026) | Original | Corregida | 2/√n |
+|---|---|---|---|
+| Cobre, retorno de la semana | -0.100 | **+0.041** | 0.068 |
+| Cobre, momentum 4 semanas | -0.055 | **+0.016** | 0.068 |
+| Diferencial de tasas (semanal) | +0.007 | +0.009 | 0.068 |
+| Cobre, retorno del mes | +0.100 | +0.090 | 0.142 |
+| Cobre, momentum 3 meses | +0.003 | +0.025 | 0.142 |
+| Diferencial de tasas (mensual) | +0.017 | +0.011 | 0.142 |
+
+**Screening** (`70_screening_backtest_variables_clp.py`, 24 pruebas = 18 nuevas + 6 re-verificadas, solo datos < 2025): **ninguna sobrevive**. Las únicas con p < 0.05 sin corregir son el nivel del VIX (semanal -0.076, mensual -0.163) y ambas quedan con q = 0.39 tras FDR; la mensual supera el umbral de |r| (0.149 con n = 180), pero no la corrección por pruebas múltiples. El resto está en |r| < 0.07 semanal. `ech_ret_1` mensual (0.135) cambia de 0.02 a 0.19 entre mitades: inestable.
+
+**Backtest de todas las variables** (walk-forward expansivo 2015-2024 con reestimación anual del signo y la mediana solo con train, posición ±1 en USD/CLP, **carry incluido** —estar largo USD paga el diferencial Chile-EE.UU.—, spread por rotación 0.15%; `issue14_backtest_variables_clp.csv`). El Sharpe máximo esperado por azar entre las 18 estrategias es 0.59.
+
+| Estrategia (neto, rotación) | Semanal: Sharpe [IC95] | Mensual: Sharpe [IC95] |
+|---|---|---|
+| Nivel del VIX | **0.66 [0.11, 1.20]** | 0.46 [-0.12, 1.09] |
+| Retorno S&P 500 | -0.32 | 0.45 [-0.13, 1.08] |
+| Retorno acciones chilenas (ECH) | -0.18 | 0.34 |
+| Resto (DXY, bono 2 años, WTI, EEM, carry, cambio del VIX) | -0.53 a -0.11 | -0.25 a 0.01 |
+| Largo USD/CLP permanente | 0.25 | 0.21 |
+| Largo CLP permanente (con carry) | -0.25 | -0.21 |
+
+Operando todas las semanas con el costo ida+vuelta completo, el VIX semanal cae a 0.15. Por el criterio fijado, **el hold-out no se abre**: ninguna variable sobrevive el screening.
+
+**Confirmación de la única pista, el VIX** (`71_confirmacion_vix_otras_monedas.py`). Lectura económica: después de semanas de estrés, las monedas emergentes se recuperan (prima por mantenerlas en el pánico). Si fuera real, debería aparecer en monedas que no se usaron para formular la hipótesis. Regla fija, sin reestimar nada por moneda: VIX sobre su mediana de train → largo moneda local contra USD; si no, corto (semanal, 2015-2024, sin carry).
+
+| Grupo | Monedas | Sharpe neto por moneda | Cartera equiponderada [IC95] |
+|---|---|---|---|
+| EM (predicción: > 0) | BRL, MXN, COP, ZAR, PEN | 0.14, 0.35, 0.08, 0.14, -0.11 | 0.18 [-0.36, 0.73] |
+| G10 sensibles al riesgo | AUD, NZD, CAD, NOK | 0.44, 0.45, 0.22, 0.12 | 0.37 [-0.21, 0.94] |
+| Refugios (control: ≈ 0) | JPY, CHF | 0.00, 0.12 | 0.08 [-0.54, 0.63] |
+| Referencia | CLP | 0.66 [0.12, 1.20] | — |
+
+La dirección es coherente con la hipótesis (8 de 9 monedas de riesgo positivas, los refugios en cero) pero la magnitud es chica: ninguna moneda salvo CLP tiene un IC95 que excluya el cero, y la de CLP es la que generó la hipótesis. **Lectura honesta**: no hay, con estas variables, una estrategia de USD/CLP rentable que resista la corrección por pruebas múltiples. El VIX es una pista débil de prima por riesgo, más consistente con un efecto de cartera (varias monedas de riesgo a la vez) que con una señal para operar CLP solo; su lugar natural es como variable de régimen dentro de la cartera del [Issue #15](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/15), evaluada ahí con su propio registro de pruebas.
+
+**Pendiente** (bloqueado por datos, [Issue #16](https://github.com/bastianbm7/usdclp-nbeats-arima-forecasting/issues/16)): posiciones en forwards de las AFP, sorpresas de TPM contra la Encuesta de Expectativas y EMBI Chile requieren la API del BCCh o descargas manuales de la Superintendencia de Pensiones.
 
 ## Reproducibilidad
 
@@ -925,3 +974,5 @@ Todo el código está en `codigos/` (scripts `01` a `08` para el forecasting de 
 5. `66_tft_panel_corregido.py --modo panel`, `--modo solo_clp` (~3.6 h cada uno) y `--resumen` (9.33); `67_momentum_transformer_corregido.py` (9.34, ~1 h).
 
 Los logs de estas corridas están en `datos/resultados/_log_correccion_*.txt`.
+
+**Issue #14 (9.36)**, desde `codigos/`: `68_features_semanales_mensuales_corregido.py` (sin red), `69_variables_externas_clp.py` (descarga FRED/Yahoo a `datos/bases/issue14_variables_externas.csv`), `70_screening_backtest_variables_clp.py` (necesita la salida de 68) y `71_confirmacion_vix_otras_monedas.py`; cada uno tarda menos de un minuto. Todos anotan sus pruebas en `datos/resultados/registro_pruebas.csv` (`protocolo_evaluacion.py`).
